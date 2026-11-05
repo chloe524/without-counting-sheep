@@ -298,7 +298,8 @@ function viewLogin() {
     el('label', { class: 'check' }, el('input', { type: 'checkbox', name: 'remember' }), el('span', {}, '자동 로그인')),
     error,
     el('button', { class: 'btn', type: 'submit' }, '로그인')),
-    el('p', { class: 'small muted' }, `패스워드를 잊었다면 연구자(${config.researcher.email})에게 문의해 주세요.`)));
+    el('p', { class: 'small muted' }, `패스워드를 잊었다면 연구자(${config.researcher.email})에게 문의해 주세요.`),
+    el('p', { class: 'small' }, el('a', { href: '#/developer' }, '개발자 모드'))));
 }
 
 // ---------- 기초 설문 ----------
@@ -963,7 +964,8 @@ async function viewSettings() {
       el('a', { href: '/api/consent/copy', download: 'consent-copy.txt' }, '동의서 사본 내려받기')),
     el('section', { class: 'stack' },
       el('h2', {}, '문의'),
-      el('p', {}, `연구자: ${config.researcher.email}, ${config.researcher.phone}`)),
+      el('p', {}, `연구자: ${config.researcher.email}, ${config.researcher.phone}`),
+      el('p', {}, el('a', { href: '#/developer' }, '개발자 모드'))),
     el('section', { class: 'stack' }, logoutButton()),
     el('section', { class: 'stack' },
       el('h2', {}, '참여 그만두기'),
@@ -1084,6 +1086,13 @@ async function route() {
   const hash = location.hash || '#/';
   try {
     config ??= await api('/public/config');
+    root.classList.toggle('wide', hash === '#/developer');
+    if (hash === '#/developer') {
+      show({ banner: false });
+      tabs.hidden = true;
+      const { startDeveloper } = await import('./developer.js');
+      return await startDeveloper(root, { home: '#/' });
+    }
     await loadMe();
     if (!state.me) {
       renderTabs();
