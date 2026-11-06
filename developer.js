@@ -51,7 +51,9 @@ function section(title, ...content) {
 
 function viewLogin(message = '') {
   const error = el('p', { class: 'error', role: 'alert' }, message);
-  const input = el('input', { type: 'password', name: 'password', required: true, autocomplete: 'current-password' });
+  // 입력한 글자를 그대로 보여 준다. 폰 키보드가 글자를 바꾸지 않도록 자동 수정을 끈다.
+  const input = el('input', { type: 'text', name: 'password', required: true, autocomplete: 'off' });
+  for (const [name, value] of [['autocapitalize', 'none'], ['autocorrect', 'off'], ['spellcheck', 'false']]) input.setAttribute(name, value);
   show(el('main', { class: 'stack-lg' },
     el('h1', {}, '개발자 모드'),
     el('form', {
@@ -64,7 +66,6 @@ function viewLogin(message = '') {
           await viewList();
         } catch (err) {
           error.textContent = err.message;
-          input.value = '';
         }
       },
     },
