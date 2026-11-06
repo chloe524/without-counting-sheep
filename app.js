@@ -201,8 +201,24 @@ async function viewConsent() {
   }
   const doc = await api('/public/consent');
   const error = errorLine();
+  const syncAll = () => {
+    const boxes = [...form.querySelectorAll('input[name=consent]')];
+    const count = boxes.filter((b) => b.checked).length;
+    allBox.checked = count === boxes.length;
+    allBox.indeterminate = count > 0 && count < boxes.length;
+  };
+  const allBox = el('input', {
+    type: 'checkbox',
+    onchange: (e) => {
+      for (const b of form.querySelectorAll('input[name=consent]')) b.checked = e.target.checked;
+      syncAll();
+    },
+  });
   const form = el('form', {
     class: 'stack-lg',
+    onchange: (e) => {
+      if (e.target.name === 'consent') syncAll();
+    },
     onsubmit: submitter(error, (e) => {
       const checked = new FormData(e.target).getAll('consent');
       const missing = doc.groups.flatMap((g) => g.items).filter((i) => i.required && !checked.includes(i.id));
@@ -212,6 +228,7 @@ async function viewConsent() {
       go('#/signup');
     }),
   },
+  el('label', { class: 'check' }, allBox, el('span', {}, el('strong', {}, '모두 동의'), ' (선택 항목 포함)')),
   doc.groups.map((g) => el('fieldset', { class: 'stack' },
     el('legend', {}, el('h3', {}, g.title), g.basis ? el('span', { class: 'basis' }, g.basis) : null),
     g.items.map((i) => el('label', { class: 'check' },
@@ -226,6 +243,7 @@ async function viewConsent() {
       el('summary', {}, `자세히 보기: ${s.title}`),
       el('div', { class: 'stack' }, renderBlocks(s.blocks))))),
     form));
+  syncAll();
 }
 
 function viewSignup() {
