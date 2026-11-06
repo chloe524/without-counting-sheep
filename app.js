@@ -179,7 +179,8 @@ function viewLanding() {
     el('h1', {}, config.name),
     el('div', { class: 'landing-actions' },
       el('a', { class: 'btn', href: '#/consent' }, '시작하기'),
-      el('a', { class: 'btn ghost', href: '#/login' }, '재로그인'))));
+      el('a', { class: 'btn ghost', href: '#/login' }, '재로그인'),
+      el('a', { class: 'btn ghost', href: '#/developer' }, '개발자 모드'))));
 }
 
 function renderBlocks(blocks) {
