@@ -1,6 +1,6 @@
-// 공개 시연판의 개발자 모드 비밀번호 해시. 공개 저장소에 올라가므로 서버용 ADMIN_PASSWORD와 다른 값을 쓴다.
+// 공개 시연판의 개발자 모드 비밀번호 해시. npm run demo:password로 만든다.
 export const adminPasswordHash = {
-  salt: 'dc838b6c3b2efa83ae4457b78210fe56',
+  salt: 'c16f8ff818c59b5b4d793e4a7a50586a',
   iterations: 310000,
-  hash: '6b62eb7a9357853a25e3e211306c6d9a9ac834fe6a0c2963b7f34cf60a95b730',
+  hash: '05fceffec9f3baf55bbd587f7a5c6226552a7945c373a5f5efd4aaa12aafde94',
 };
