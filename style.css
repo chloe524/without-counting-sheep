@@ -257,7 +257,7 @@ details > .stack { margin-top: 12px; }
 pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8125rem; }
 
 /* 첫 화면: 제목과 버튼만 */
-.landing { min-height: calc(100svh - 56px); display: flex; flex-direction: column; justify-content: center; gap: 3rem; }
+.landing { min-height: calc(100svh - 56px); display: flex; flex-direction: column; justify-content: center; gap: 2rem; }
 .landing-actions { display: flex; flex-direction: column; gap: 12px; }
 .landing-actions .btn { text-align: center; padding: 14px 22px; font-size: var(--step-1); }
 

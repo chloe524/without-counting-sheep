@@ -3,7 +3,8 @@
 import { offlineCloud } from './cloud.js';
 import { study } from '../src/content/study.js';
 import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js';
-import { durationOptions, frequencyOptions, isiItems, safetyItems, susItems } from '../src/content/survey.js';
+import { isiItems, surveyQuestions } from '../src/content/survey.js';
+import { parseBaseline, personalizeContent, scorePsqi } from '../src/baseline.js';
 import { educationIds, educationModules } from '../src/content/education.js';
 import { fallbackPlan } from '../src/content/fallback-plans.js';
 import {
@@ -73,7 +74,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       summary,
       dangerFlag: Boolean(u.restriction_stopped_at),
     });
-    const content = fallbackPlan({ track: u.track, week, safety, pattern: u.sleep_pattern });
+    const content = personalizeContent(fallbackPlan({ track: u.track, week, safety, pattern: u.sleep_pattern }), u.surveys.profile?.answers, safety);
     db.nextId += 1;
     const plan = { id: db.nextId, week, status: 'ready', window, content, checks: [] };
     u.plans.push(plan);
@@ -210,32 +211,30 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       };
     }],
 
-    ['GET', /^\/survey\/questions$/, 'auth', () => ({
-      isi: isiItems, duration: durationOptions, frequency: frequencyOptions, safety: safetyItems.map(({ id, text }) => ({ id, text })), sus: susItems,
-    })],
+    ['GET', /^\/survey\/questions$/, 'auth', () => surveyQuestions()],
 
     ['POST', /^\/survey\/baseline$/, 'active', ({ u, body }) => {
       if (u.stage !== 'survey') throw new HttpError(409, '이미 기초 설문을 마쳤습니다.');
-      const { isi, duration, frequency, safety, wake, sleepHours, inBedHours } = body ?? {};
-      let isiTotal;
+      let b;
       try {
-        isiTotal = scoreIsi(isi);
-        parseTime(wake);
+        b = parseBaseline(body, { age: u.age });
       } catch (err) {
         throw new HttpError(400, err.message);
       }
-      if (!durationOptions.some((o) => o.value === duration) || !frequencyOptions.some((o) => o.value === frequency)) throw new HttpError(400, '기간과 빈도를 선택해 주세요.');
-      if (safetyItems.some((item) => typeof safety?.[item.id] !== 'boolean')) throw new HttpError(400, '건강 상태 문항에 모두 답해 주세요.');
-      const sleepMin = Math.round(Number(sleepHours) * 60);
-      const tibMin = Math.round(Number(inBedHours) * 60);
-      if (!(sleepMin > 0 && sleepMin <= 960) || !(tibMin >= sleepMin && tibMin <= 960)) throw new HttpError(400, '평소 수면 시간과 침대에 있는 시간을 확인해 주세요.');
-
-      const verdict = evaluateSafety(safety, { age: u.age });
-      const track = classifyTrack({ isiTotal, duration, frequency });
-      u.surveys['baseline-isi'] = { answers: { isi, duration, frequency, sleepHours, inBedHours, wake }, score: isiTotal, elapsed_sec: elapsedOf(body), created_at: iso() };
-      u.surveys.safety = { answers: safety, score: null, created_at: iso() };
+      const verdict = evaluateSafety(b.safety, { age: u.age });
+      const track = classifyTrack({ isiTotal: b.isiTotal, duration: b.duration, frequency: b.frequency });
+      const at = iso();
+      Object.assign(u.surveys, {
+        'baseline-isi': { answers: { isi: b.isi, duration: b.duration, frequency: b.frequency, sex: b.sex, wake: b.wake }, score: b.isiTotal, elapsed_sec: elapsedOf(body), created_at: at },
+        'baseline-psqi': { answers: { ...b.psqi, components: b.psqiResult.components }, score: b.psqiResult.total, created_at: at },
+        first: { answers: { answers: b.first, group: b.firstResult.group }, score: b.firstResult.total, created_at: at },
+        arousal: { answers: { answers: b.arousal, scores: b.arousalScores }, score: null, created_at: at },
+        beliefs: { answers: b.beliefResult, score: b.beliefResult.count, created_at: at },
+        profile: { answers: b.profile, score: null, created_at: at },
+        safety: { answers: b.safety, score: null, created_at: at },
+      });
       Object.assign(u, {
-        track, safety: verdict, wake_time: wake, baseline_sleep_min: sleepMin, baseline_tib_min: tibMin, sleep_pattern: sleepPattern(isi),
+        track, safety: verdict, wake_time: b.wake, baseline_sleep_min: b.sleepMin, baseline_tib_min: b.tibMin, sleep_pattern: sleepPattern(b.isi),
         stage: track === 'long' ? 'education' : 'program', excluded_at: verdict.excluded ? iso() : null,
       });
       if (track === 'short' && !verdict.excluded) startProgram(u);
@@ -323,12 +322,15 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       advanceIfFinished(u);
       if (u.stage !== 'final-survey') throw new HttpError(409, '아직 수면 설문을 다시 쓸 단계가 아닙니다.');
       let score;
+      let psqi;
       try {
         score = scoreIsi(body?.isi);
+        psqi = scorePsqi(body?.psqi);
       } catch (err) {
         throw new HttpError(400, err.message);
       }
       u.surveys['final-isi'] = { answers: { isi: body.isi }, score, elapsed_sec: elapsedOf(body), created_at: iso() };
+      u.surveys['final-psqi'] = { answers: { ...body.psqi, components: psqi.components }, score: psqi.total, created_at: iso() };
       u.stage = 'usability';
       return { ok: true };
     }],
@@ -361,6 +363,8 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         isiAfter: after,
         isiChange: after - before,
         isiMax: isiItems.length * 4,
+        psqiBefore: u.surveys['baseline-psqi']?.score ?? null,
+        psqiAfter: u.surveys['final-psqi']?.score ?? null,
         diaryNights: diaryRange(u, u.program_start, end).length,
         programDays: 21,
         sePctWeek1: first.sePct ?? null,
