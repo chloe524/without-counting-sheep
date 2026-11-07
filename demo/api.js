@@ -1,6 +1,6 @@
-// 공개 시연판의 가짜 서버. src/app.js의 응답 형식을 따르되, 자료는 방문자의 브라우저에만 저장한다.
-// 외부로 아무것도 보내지 않으므로 AI 계획, 푸시, 이메일, 개발자 모드는 없다.
-import { adminPasswordHash } from './admin-password.js';
+// 공개 시연판의 서버 역할. src/app.js의 응답 형식을 따른다. 화면은 브라우저 저장소로 동작하고,
+// 바뀐 자료를 저장소(cloud)로 보내 개발자 모드에서 모든 참가자의 자료를 볼 수 있게 한다. AI 계획, 푸시, 이메일은 없다.
+import { offlineCloud } from './cloud.js';
 import { study } from '../src/content/study.js';
 import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js';
 import { durationOptions, frequencyOptions, isiItems, safetyItems, susItems } from '../src/content/survey.js';
@@ -33,14 +33,7 @@ async function hashPassword(password, salt) {
   return hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${salt}:${password}`)));
 }
 
-export async function deriveAdminHash(password, salt, iterations) {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt), iterations }, key, 256));
-}
-
-const SCOPE_NOTICE = '시연판은 서버가 없어 이 브라우저에 저장된 자료만 보입니다. 다른 사람이 자기 기기에서 입력한 자료는 여기에 나오지 않습니다.';
-
-export function createDemoApi({ storage, now = () => new Date(), adminHash = adminPasswordHash }) {
+export function createDemoApi({ storage, now = () => new Date(), cloud = offlineCloud }) {
   const today = () => kstDate(now());
   const iso = () => now().toISOString();
   const elapsedOf = (body) => {
@@ -132,72 +125,7 @@ export function createDemoApi({ storage, now = () => new Date(), adminHash = adm
 
   const latestPlanWindow = (u) => [...u.plans].sort((a, b) => b.week - a.week)[0]?.window ?? null;
 
-  const adminLoggedIn = (db) => (db.adminUntil ?? 0) >= now().getTime();
-  const requireAdmin = (db) => {
-    if (!adminLoggedIn(db)) throw new HttpError(401, '비밀번호를 입력해 주세요.');
-  };
-  const logAdmin = (db, action, target = null) => {
-    db.adminLog = [{ action, target, at: iso() }, ...(db.adminLog ?? [])].slice(0, 20);
-  };
-  const codeOf = (u) => `P-${u.id}`;
-  const statusRow = (u) => ({
-    code: codeOf(u), username: u.username, nickname: u.nickname, fullName: u.fullName, email: u.email, phone: u.phone, age: u.age, stage: u.stage, track: u.track,
-    excludedAt: u.excluded_at, withdrawnAt: u.withdrawn_at, createdAt: u.consent_at,
-    isiBefore: u.surveys['baseline-isi']?.score ?? null, isiAfter: u.surveys['final-isi']?.score ?? null,
-    diaryNights: Object.keys(u.diary).length, lastActive: (u.usage ?? []).at(-1)?.occurred_on ?? null,
-  });
-
   const routes = [
-    ['GET', /^\/admin\/status$/, null, ({ db }) => ({ enabled: true, loggedIn: adminLoggedIn(db) })],
-
-    ['POST', /^\/admin\/login$/, null, async ({ db, body }) => {
-      const given = typeof body?.password === 'string' ? body.password : '';
-      if (await deriveAdminHash(given, adminHash.salt, adminHash.iterations) !== adminHash.hash) {
-        logAdmin(db, 'login-failed');
-        storage.setItem(KEY, JSON.stringify(db));
-        throw new HttpError(401, '비밀번호가 맞지 않습니다.');
-      }
-      db.adminUntil = now().getTime() + 30 * 60 * 1000;
-      logAdmin(db, 'login');
-      return { ok: true };
-    }],
-
-    ['POST', /^\/admin\/logout$/, null, ({ db }) => {
-      requireAdmin(db);
-      db.adminUntil = 0;
-      return { ok: true };
-    }],
-
-    ['GET', /^\/admin\/participants$/, null, ({ db }) => {
-      requireAdmin(db);
-      logAdmin(db, 'list');
-      return { participants: db.users.map(statusRow).reverse(), accessLog: db.adminLog, scopeNotice: SCOPE_NOTICE };
-    }],
-
-    // 비밀번호 해시와 솔트는 일부러 내보내지 않는다.
-    ['GET', /^\/admin\/participants\/([\w-]+)$/, null, ({ db, params }) => {
-      requireAdmin(db);
-      const u = db.users.find((a) => codeOf(a) === params[0]);
-      if (!u) throw new HttpError(404, '없는 참가자입니다.');
-      logAdmin(db, 'view', params[0]);
-      return {
-        account: { id: u.id, username: u.username, nickname: u.nickname, fullName: u.fullName, email: u.email, phone: u.phone, createdAt: u.consent_at },
-        participant: {
-          code: codeOf(u), age: u.age, consent_items: JSON.stringify(u.consent_items), consent_at: u.consent_at, stage: u.stage, track: u.track, safety: JSON.stringify(u.safety),
-          excluded_at: u.excluded_at, program_start: u.program_start, wake_time: u.wake_time, baseline_sleep_min: u.baseline_sleep_min, baseline_tib_min: u.baseline_tib_min,
-          sleep_pattern: u.sleep_pattern, restriction_stopped_at: u.restriction_stopped_at, withdrawn_at: u.withdrawn_at,
-        },
-        notifications: u.prefs,
-        surveys: Object.entries(u.surveys).map(([kind, v]) => ({ kind, answers: JSON.stringify(v.answers), score: v.score, elapsed_sec: v.elapsed_sec ?? null, created_at: v.created_at })),
-        education: Object.entries(u.education).map(([module_id, v]) => ({ module_id, answers: JSON.stringify(v.answers), elapsed_sec: v.elapsed_sec, completed_at: v.completed_at })),
-        plans: u.plans.map((p) => ({ week: p.week, status: p.status, source: 'fallback', fallback_reason: '시연판', window_json: JSON.stringify(p.window), content: JSON.stringify(p.content) })),
-        tasks: u.plans.flatMap((p) => p.checks.map((c) => ({ week: p.week, day_index: c.day, task_index: c.task }))),
-        diary: Object.values(u.diary).sort((a, b) => b.night.localeCompare(a.night)),
-        sleep: [...u.sleep].reverse().map(({ status, started_at, ended_at, on_seconds, alarm_at, perceived_min }) => ({ status, started_at, ended_at, on_seconds, alarm_at, perceived_min })),
-        usage: [...(u.usage ?? [])].reverse(),
-      };
-    }],
-
     ['GET', /^\/public\/config$/, null, () => ({
       name: study.name,
       signupOpen: true,
@@ -207,10 +135,11 @@ export function createDemoApi({ storage, now = () => new Date(), adminHash = adm
 
     ['GET', /^\/public\/consent$/, null, () => consentDocument()],
 
-    ['GET', /^\/auth\/check-username$/, null, ({ db, query }) => {
+    ['GET', /^\/auth\/check-username$/, null, async ({ db, query }) => {
       const username = query.get('username') ?? '';
       if (!USERNAME.test(username)) return { valid: false, available: false };
-      return { valid: true, available: !db.users.some((a) => a.username.toLowerCase() === username.toLowerCase()) };
+      const remote = await cloud.check(username, null);
+      return { valid: true, available: !remote?.usernameTaken && !db.users.some((a) => a.username.toLowerCase() === username.toLowerCase()) };
     }],
 
     ['POST', /^\/auth\/signup$/, null, async ({ db, body }) => {
@@ -229,6 +158,10 @@ export function createDemoApi({ storage, now = () => new Date(), adminHash = adm
       if (wantsPhone && !PHONE.test(phone?.trim() ?? '')) throw new HttpError(400, '전화번호를 확인해 주세요.');
       if (db.users.some((a) => a.username.toLowerCase() === username.toLowerCase())) throw new HttpError(409, '이미 쓰고 있는 아이디입니다.');
       if (db.users.some((a) => a.email.toLowerCase() === email.toLowerCase())) throw new HttpError(409, '이미 가입한 이메일입니다.');
+      // 다른 사람의 브라우저에서 가입한 아이디와 이메일도 막는다.
+      const remote = await cloud.check(username, email);
+      if (remote?.usernameTaken) throw new HttpError(409, '이미 쓰고 있는 아이디입니다.');
+      if (remote?.emailTaken) throw new HttpError(409, '이미 가입한 이메일입니다.');
 
       const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
       db.nextId += 1;
@@ -529,10 +462,55 @@ export function createDemoApi({ storage, now = () => new Date(), adminHash = adm
     }],
   ];
 
+  const loadDb = () => JSON.parse(storage.getItem(KEY) ?? 'null') ?? { nextId: 0, users: [], session: null };
+  const randomHex = (bytes) => hex(crypto.getRandomValues(new Uint8Array(bytes)));
+
+  // 저장소 연결 전에 만든 계정에도 코드와 토큰을 주어 다음 접속 때 함께 보낸다.
+  const prepareForCloud = (u) => {
+    if (u.cloudToken) return;
+    u.code = `P-${randomHex(5).toUpperCase()}`;
+    u.cloudToken = randomHex(32);
+    u.dirty = true;
+    u.rev = (u.rev ?? 0) + 1;
+  };
+
+  // 식별 정보와 연구 자료를 나누어 보낸다. 비밀번호 해시와 토큰은 연구 자료에 넣지 않는다.
+  const cloudPayload = (u) => {
+    const { id, username, email, nickname, fullName, phone, salt, hash, code, cloudToken, dirty, rev, ...record } = u;
+    return { code, token: cloudToken, identity: { username, email, nickname, fullName, phone }, record };
+  };
+
+  let flushing = null;
+  const flush = (userId) => {
+    flushing ??= (async () => {
+      try {
+        for (;;) {
+          const u = loadDb().users.find((a) => a.id === userId);
+          if (!u?.dirty) return;
+          if (!await cloud.sync(cloudPayload(u))) return;
+          const db = loadDb();
+          const fresh = db.users.find((a) => a.id === userId);
+          if (fresh?.rev === u.rev) {
+            fresh.dirty = false;
+            storage.setItem(KEY, JSON.stringify(db));
+            return;
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        flushing = null;
+      }
+    })();
+    return flushing;
+  };
+
   async function handle(method, url, body) {
     const { pathname, searchParams } = new URL(url, 'http://demo.invalid');
-    const db = JSON.parse(storage.getItem(KEY) ?? 'null') ?? { nextId: 0, users: [], session: null };
+    if (pathname.startsWith('/admin')) return cloud.admin(pathname, body);
+    const db = loadDb();
     try {
+      db.users.forEach(prepareForCloud);
       for (const [routeMethod, pattern, guard, action] of routes) {
         const match = routeMethod === method && pattern.exec(pathname);
         if (!match) continue;
@@ -542,14 +520,26 @@ export function createDemoApi({ storage, now = () => new Date(), adminHash = adm
           if (u.withdrawn_at) throw new HttpError(403, '참여를 그만둔 계정입니다.');
           if (u.excluded_at) throw new HttpError(403, '이 프로그램에 참여할 수 없는 계정입니다.');
         }
+        const before = u ? JSON.stringify(u) : null;
         const result = await action({ db, u, body, query: searchParams, params: match.slice(1) });
         // 개발자 모드에서 볼 사용 기록. 입력 내용은 남기지 않고 어떤 동작을 했는지만 남긴다.
-        const acting = (method === 'POST' && !pathname.startsWith('/admin') && db.users.find((x) => x.id === db.session?.userId)) || (pathname === '/me' && u);
+        const acting = db.users.find((x) => x.id === db.session?.userId);
         if (acting) {
-          acting.usage = [...(acting.usage ?? []), { event: pathname === '/me' ? 'visit' : pathname.slice(1), elapsed_sec: elapsedOf(body), occurred_on: today() }].slice(-500);
+          const isVisit = pathname === '/me';
+          const seenToday = (acting.usage ?? []).some((e) => e.event === 'visit' && e.occurred_on === today());
+          if ((method === 'POST' && !isVisit) || (isVisit && !seenToday)) {
+            acting.usage = [...(acting.usage ?? []), { event: isVisit ? 'visit' : pathname.slice(1), elapsed_sec: elapsedOf(body), occurred_on: today() }].slice(-500);
+          }
+          prepareForCloud(acting);
+          if (JSON.stringify(acting) !== before) {
+            acting.dirty = true;
+            acting.rev = (acting.rev ?? 0) + 1;
+          }
         }
         // 오류가 나면 저장하지 않으므로 절반만 바뀐 자료가 남지 않는다.
         storage.setItem(KEY, JSON.stringify(db));
+        // 수면 화면이 켜져 있는 동안 1분마다 보내지 않도록 하트비트는 다음 동작 때 함께 보낸다.
+        if (acting?.dirty && pathname !== '/sleep/heartbeat') flush(acting.id);
         return result?.status ? result : { status: 200, data: result };
       }
       throw new HttpError(404, '없는 주소입니다.');
@@ -560,5 +550,5 @@ export function createDemoApi({ storage, now = () => new Date(), adminHash = adm
     }
   }
 
-  return { handle };
+  return { handle, idle: () => flushing ?? Promise.resolve() };
 }

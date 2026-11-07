@@ -91,7 +91,7 @@ const statusOf = (p) => {
 };
 
 async function viewList() {
-  const { participants, accessLog, scopeNotice } = await api('/participants');
+  const { participants, accessLog } = await api('/participants');
   const search = el('input', { type: 'text', placeholder: '이름, 아이디, 이메일, 전화번호, 코드', 'aria-label': '참가자 검색' });
   const holder = el('div');
   const render = () => {
@@ -110,7 +110,6 @@ async function viewList() {
   render();
   show(el('main', { class: 'stack-lg' },
     el('div', { class: 'actions' }, el('h1', {}, '개발자 모드'), logout()),
-    scopeNotice ? el('p', { class: 'notice' }, scopeNotice) : null,
     el('p', { class: 'notice' }, '참가자의 개인정보와 건강정보입니다. 연구 목적으로만 열람하고, 화면을 켜 둔 채 자리를 비우지 마세요. 30분 뒤 자동으로 로그아웃됩니다.'),
     section(`참가자 ${participants.length}명`, search, holder),
     el('details', {}, el('summary', {}, '최근 개발자 모드 사용 기록'), el('div', { class: 'stack' }, rowsTable(accessLog)))));
