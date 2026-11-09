@@ -4,7 +4,7 @@ import { offlineCloud } from './cloud.js';
 import { study } from '../src/content/study.js';
 import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js';
 import { isiItems, surveyQuestions } from '../src/content/survey.js';
-import { parseBaseline, personalizeContent, scorePsqi } from '../src/baseline.js';
+import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js';
 import { educationIds, educationModules } from '../src/content/education.js';
 import { fallbackPlan } from '../src/content/fallback-plans.js';
 import {
@@ -68,8 +68,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       track: u.track,
       safety,
       wake: u.wake_time,
-      baselineSleepMin: u.baseline_sleep_min,
-      baselineTibMin: u.baseline_tib_min,
+      totalNights: Object.keys(u.diary).filter((night) => night < weekStart).length,
       previousTibMin: u.plans.find((p) => p.week === week - 1)?.window.tibMin ?? null,
       summary,
       dangerFlag: Boolean(u.restriction_stopped_at),
@@ -124,6 +123,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
     return row;
   };
 
+  const moduleEvents = (u) => [...new Set((u.usage ?? []).map((e) => e.event).filter((e) => e.startsWith('module-')))];
   const latestPlanWindow = (u) => [...u.plans].sort((a, b) => b.week - a.week)[0]?.window ?? null;
 
   const routes = [
@@ -228,8 +228,8 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         'baseline-isi': { answers: { isi: b.isi, duration: b.duration, frequency: b.frequency, sex: b.sex, wake: b.wake }, score: b.isiTotal, elapsed_sec: elapsedOf(body), created_at: at },
         'baseline-psqi': { answers: { ...b.psqi, components: b.psqiResult.components }, score: b.psqiResult.total, created_at: at },
         first: { answers: { answers: b.first, group: b.firstResult.group }, score: b.firstResult.total, created_at: at },
-        arousal: { answers: { answers: b.arousal, scores: b.arousalScores }, score: null, created_at: at },
-        beliefs: { answers: b.beliefResult, score: b.beliefResult.count, created_at: at },
+        arousal: { answers: { answers: b.arousal, ...b.profile.arousal }, score: null, created_at: at },
+        dbas: { answers: { answers: b.dbas, ...b.dbasResult }, score: b.dbasResult.mean, created_at: at },
         profile: { answers: b.profile, score: null, created_at: at },
         safety: { answers: b.safety, score: null, created_at: at },
       });
@@ -286,7 +286,18 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
     ['GET', /^\/diary$/, 'auth', ({ u }) => ({
       entries: Object.values(u.diary).sort((a, b) => b.night.localeCompare(a.night)).slice(0, 28),
       today: today(),
+      stressRequired: needsStressScore(u.surveys.profile?.answers),
     })],
+
+    ['GET', /^\/modules$/, 'active', ({ u }) => ({
+      view: moduleView(u.surveys.profile?.answers, moduleEvents(u), u.program_start ? programPosition(u.program_start, today()).week : null),
+    })],
+
+    ['POST', /^\/modules\/(\w+)\/(start|complete)$/, 'active', ({ u, params }) => {
+      if (!MODULE_IDS.includes(params[0])) throw new HttpError(404, '없는 모듈입니다.');
+      u.usage = [...(u.usage ?? []), { event: `module-${params[0]}-${params[1]}`, elapsed_sec: null, occurred_on: today() }].slice(-500);
+      return { ok: true };
+    }],
 
     ['POST', /^\/diary$/, 'active', ({ u, body }) => {
       const b = body ?? {};
@@ -303,10 +314,12 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         throw new HttpError(400, err.message);
       }
       const danger = b.danger === true;
+      if (b.stress !== undefined && b.stress !== null && !(Number.isInteger(b.stress) && b.stress >= 0 && b.stress <= 4)) throw new HttpError(400, '낮 스트레스 점수를 확인해 주세요.');
+      if (needsStressScore(u.surveys.profile?.answers) && !Number.isInteger(b.stress)) throw new HttpError(400, '낮 스트레스 점수를 적어 주세요.');
       u.diary[b.night] = {
         night: b.night, bedtime: b.bedtime, sleep_try: b.sleepTry, latency_min: b.latencyMin, awakenings: b.awakenings, waso_min: b.wasoMin,
         final_wake: b.finalWake, out_of_bed: b.outOfBed, quality: b.quality, sleepiness: b.sleepiness, danger: danger ? 1 : 0, nap_min: b.napMin,
-        tib_min: m.tibMin, tst_min: m.tstMin, se_pct: m.sePct, elapsed_sec: elapsedOf(b), saved_at: iso(),
+        tib_min: m.tibMin, tst_min: m.tstMin, se_pct: m.sePct, elapsed_sec: elapsedOf(b), saved_at: iso(), stress: Number.isInteger(b.stress) ? b.stress : null,
       };
       let restrictionStopped = false;
       if (danger && !u.restriction_stopped_at) {
@@ -373,6 +386,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         sleepNights: rated.length,
         avgOnMin: average(rated.map((s) => s.on_seconds / 60)),
         avgPerceivedMin: average(rated.map((s) => s.perceived_min)),
+        variables: resultVariables(u.surveys.profile?.answers, moduleEvents(u), diaryRange(u, u.program_start, end)),
       };
     }],
 

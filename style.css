@@ -302,4 +302,16 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.81
   border-radius: 6px;
 }
 
+/* 0~10점처럼 숫자가 많은 척도 */
+.scale.numeric { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 3px; }
+.scale.numeric label { justify-content: center; padding: 8px 0; gap: 0; flex-direction: column; font-size: var(--step--1, 0.85rem); }
+.scale.numeric input { width: 16px; height: 16px; }
+
+/* 맞춤 모듈 */
+.module { border-top: 1px solid var(--line); padding-top: 14px; }
+.module h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.badge { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
+.badge.required { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.badge.recommended { border-color: var(--accent); color: var(--accent); }
+
 .demo-note { margin: 0; padding: 8px 16px; background: #5C6168; color: #FFFFFF; font-size: 13px; line-height: 1.5; text-align: center; }

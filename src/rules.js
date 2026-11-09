@@ -78,8 +78,14 @@ export function summarizeDiary(entries) {
 
 const toStep = (min) => Math.round(min / STEP_MIN) * STEP_MIN;
 
-// 수면 효율 90% 이상이면 15분 늘리고, 85% 미만이면 15분 줄인다(하한 유지). 7일마다 평가한다.
-export function computeSleepWindow({ track, safety, wake, baselineSleepMin, baselineTibMin, previousTibMin = null, summary = { nights: 0 }, dangerFlag = false }) {
+export const RESTRICTION_MIN_NIGHTS = 7;
+export const RESTRICTION_SE_MAX = 85;
+export const PREGNANCY_FLEX_MIN = 60;
+
+// 수면 제한 게이트: 안전 문진 통과 + 일지 7일 이상 + 수면 효율 85% 미만을 모두 충족해야 시작한다(빨라야 2주차).
+// 시작한 뒤에는 수면 효율 90% 이상이면 15분 늘리고, 85% 미만이면 15분 줄인다(하한 6시간 유지).
+// 임신 중에는 같은 하한을 지키고 취침·기상 시간에 30~60분의 여유를 둔다.
+export function computeSleepWindow({ track, safety, wake, previousTibMin = null, summary = { nights: 0 }, dangerFlag = false, totalNights = 0 }) {
   const wakeMin = parseTime(wake);
   const result = (mode, tib, reason) => ({
     mode,
@@ -89,6 +95,7 @@ export function computeSleepWindow({ track, safety, wake, baselineSleepMin, base
     reason,
     sePct: summary.sePct ?? null,
     nights: summary.nights,
+    flexMin: safety?.pregnant ? PREGNANCY_FLEX_MIN : 0,
   });
 
   if (track !== 'long' || safety.noRestriction || dangerFlag) {
@@ -98,14 +105,20 @@ export function computeSleepWindow({ track, safety, wake, baselineSleepMin, base
     return result('wake-only', null, reason);
   }
   if (previousTibMin === null) {
-    const start = Math.max(SLEEP_FLOOR_MIN, toStep(baselineSleepMin + 30));
-    return result('window', Math.min(start, Math.max(SLEEP_FLOOR_MIN, baselineTibMin)), '평소 실제로 잔 시간을 기준으로 정했어요.');
+    if (totalNights < RESTRICTION_MIN_NIGHTS) {
+      return result('wake-only', null, `수면 일지가 ${RESTRICTION_MIN_NIGHTS}일 이상 쌓이기 전까지는 기상 시간만 지켜요. 지금까지 ${totalNights}일 적었어요.`);
+    }
+    if (!summary.nights || summary.sePct >= RESTRICTION_SE_MAX) {
+      return result('wake-only', null, '지난주 수면 효율이 85% 이상이라 수면 시간 조절 없이 기상 시간을 지켜요.');
+    }
+    const start = Math.max(SLEEP_FLOOR_MIN, toStep(summary.avgTstMin));
+    return result('window', start, '지난주 일지에서 실제로 잔 시간을 기준으로 수면 시간을 정했어요.');
   }
   if (summary.nights < 3) return result('window', previousTibMin, '일지가 3일 미만이라 지난주 시간을 유지해요.');
   if (summary.sePct >= 90) return result('window', previousTibMin + STEP_MIN, '수면 효율이 90% 이상이라 15분 늘렸어요.');
-  if (summary.sePct < 85) {
+  if (summary.sePct < RESTRICTION_SE_MAX) {
     const next = Math.max(SLEEP_FLOOR_MIN, previousTibMin - STEP_MIN);
-    return result('window', next, next === previousTibMin ? '하한에 도달해 더 줄이지 않고 유지해요.' : '수면 효율이 85% 미만이라 15분 줄였어요.');
+    return result('window', next, next === previousTibMin ? '하한(6시간)에 도달해 더 줄이지 않고 유지해요.' : '수면 효율이 85% 미만이라 15분 줄였어요.');
   }
   return result('window', previousTibMin, '수면 효율이 85~90%라 지난주 시간을 유지해요.');
 }

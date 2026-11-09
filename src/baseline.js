@@ -1,5 +1,8 @@
 // 기초 설문 채점과 개인 맞춤 기준표. 서버(src/app.js)와 시연판(demo/api.js)이 함께 쓴다.
-import { arousalDomains, beliefItems, durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js';
+import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js';
+import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js';
+import { dbasSurvey } from './content/dbas.js';
+import { moduleContent } from './content/modules.js';
 import { parseTime, scoreIsi } from './rules.js';
 
 const isScale = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
@@ -38,33 +41,64 @@ export function scoreFirst(first) {
   return { total, group: total >= 18 ? 'high' : total >= 16 ? 'moderate' : 'nonreactive' };
 }
 
-export function scoreArousal(arousal) {
+// 과각성 20문항 [설계안, 타당도 미검증]. 하위척도마다 합산하고 전체 총점은 쓰지 않는다. 20문항 모두 답해야 채점한다.
+export function scoreArousal(answers) {
   const scores = {};
-  for (const domain of arousalDomains) {
-    const values = arousal?.[domain.id];
-    if (!Array.isArray(values) || values.length !== domain.items.length || !values.every((v) => isScale(v, 1, 4))) throw new Error('과각성 문항에 모두 답해 주세요.');
-    scores[domain.id] = values.reduce((a, b) => a + b, 0);
+  const bands = {};
+  for (const sub of arousalSurvey.subscales) {
+    const values = sub.items.map((item) => answers?.[item.id]);
+    if (!values.every((v) => isScale(v, 0, 4))) throw new Error('과각성 문항 20개에 모두 답해 주세요.');
+    scores[sub.id] = values.reduce((a, b) => a + b, 0);
+    const [low, mid] = AROUSAL_BANDS[sub.id];
+    bands[sub.id] = scores[sub.id] <= low ? 'low' : scores[sub.id] <= mid ? 'moderate' : 'high';
   }
-  return scores;
+  return { scores, bands };
 }
 
-export function scoreBeliefs(beliefs) {
-  if (!Array.isArray(beliefs)) throw new Error('잘못된 믿음 문항을 확인해 주세요.');
-  const known = beliefItems.map((b) => b.id);
-  const chosen = [...new Set(beliefs)].filter((id) => known.includes(id));
-  return { chosen, count: chosen.length };
+const LEVEL = { low: 'optional', moderate: 'recommended', high: 'required' };
+const RANK = { optional: 0, recommended: 1, required: 2 };
+const stronger = (a, b) => (RANK[a] >= RANK[b] ? a : b);
+
+// 모듈 배정 규칙 R1~R8 [설계안]. 한 모듈에 연결된 두 하위척도의 구간이 다르면 더 강한 쪽을 쓴다.
+export function assignArousalModules({ bands }) {
+  const modules = {
+    worry: stronger(LEVEL[bands.A], LEVEL[bands.C]),
+    relax: stronger(LEVEL[bands.B], LEVEL[bands.D]),
+  };
+  const rules = [];
+  if (bands.A === 'high' || bands.C === 'high') rules.push('R1');
+  if (bands.B === 'high' || bands.D === 'high') rules.push('R2');
+  if (Object.values(modules).includes('recommended')) rules.push('R3');
+  if (Object.values(modules).includes('optional')) rules.push('R4');
+  if (bands.C === 'high') rules.push('R5');
+  if (bands.D === 'high') rules.push('R6');
+  const allLow = Object.values(bands).every((b) => b === 'low');
+  if (allLow) rules.push('R7');
+  if (bands.B === 'high') rules.push('R8');
+  return { modules, rules, group: allLow ? 'non_hyperarousal' : 'hyperarousal' };
+}
+
+// DBAS-16은 문항 평균(0~10)으로 본다.
+export function scoreDbas(answers) {
+  if (!Array.isArray(answers) || answers.length !== dbasSurvey.items.length || !answers.every((v) => isScale(v, 0, 10))) throw new Error('수면에 대한 생각 문항 16개에 모두 답해 주세요.');
+  const mean = (values) => Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+  const subscales = {};
+  for (const key of Object.keys(dbasSurvey.subscales)) {
+    subscales[key] = mean(dbasSurvey.items.map((item, i) => (item.subscale === key ? answers[i] : null)).filter((v) => v !== null));
+  }
+  const total = mean(answers);
+  return { mean: total, subscales, high: total >= dbasSurvey.highMean };
 }
 
 // 침대에 머무는 시간 = 잠들기까지의 시간 + 수면 시간 + 깬 뒤 침대에 있는 시간
 export const timeInBedMin = ({ latencyMin, sleepHours, afterWakeMin }) => latencyMin + Math.round(sleepHours * 60) + afterWakeMin;
 
 const ISI_AT_RISK = 2;
-const AROUSAL_HIGH = 9; // 3문항 평균 3점(꽤 그렇다) 이상
-const BELIEFS_HIGH = 3;
 const EXCESS_BED_MIN = 60;
 
 // ISI와 PSQI 문항을 보고 어느 부분이 취약한지 나눈다. 진단이 아니라 과제를 고르는 기준이다.
-export function buildProfile({ age, sex, isi, psqiResult, firstResult, arousalScores, beliefResult, sleepMin, tibMin }) {
+// 과각성은 따로 모듈 배정(arousal.assignment)으로 다룬다.
+export function buildProfile({ age, sex, isi, psqiResult, firstResult, arousal, dbas, sleepMin, tibMin }) {
   const c = psqiResult.components;
   const areas = [];
   if (isi[0] >= ISI_AT_RISK || c.latency >= 2) areas.push('onset');
@@ -72,11 +106,9 @@ export function buildProfile({ age, sex, isi, psqiResult, firstResult, arousalSc
   if (isi[2] >= ISI_AT_RISK) areas.push('earlyWaking');
   if (c.efficiency >= 2 || tibMin - sleepMin >= EXCESS_BED_MIN) areas.push('timeInBed');
   if (isi[4] >= ISI_AT_RISK || c.daytime >= 2) areas.push('daytime');
-  if (isi[6] >= ISI_AT_RISK || arousalScores.psychological >= AROUSAL_HIGH) areas.push('worry');
-  if (arousalScores.somatic >= AROUSAL_HIGH) areas.push('somatic');
-  if (arousalScores.cognitive >= AROUSAL_HIGH) areas.push('cognitive');
+  if (isi[6] >= ISI_AT_RISK) areas.push('worry');
   if (firstResult.group !== 'nonreactive') areas.push('stress');
-  if (beliefResult.count >= BELIEFS_HIGH) areas.push('beliefs');
+  if (dbas.high) areas.push('beliefs');
   if (c.medication >= 1) areas.push('medication');
   return {
     age, sex, areas,
@@ -84,15 +116,15 @@ export function buildProfile({ age, sex, isi, psqiResult, firstResult, arousalSc
     psqiComponents: c,
     firstTotal: firstResult.total,
     firstGroup: firstResult.group,
-    arousal: arousalScores,
-    beliefs: beliefResult,
+    arousal: { ...arousal, assignment: assignArousalModules(arousal) },
+    dbas,
     tibMin,
   };
 }
 
 // 요청 본문을 검사해 저장할 값으로 바꾼다. 문제가 있으면 안내 문구로 Error를 던진다.
 export function parseBaseline(body, { age }) {
-  const { isi, duration, frequency, safety, sex, psqi, first, arousal, beliefs } = body ?? {};
+  const { isi, duration, frequency, safety, sex, psqi, first, arousal, dbas } = body ?? {};
   const isiTotal = scoreIsi(isi);
   if (!durationOptions.some((o) => o.value === duration) || !frequencyOptions.some((o) => o.value === frequency)) throw new Error('기간과 빈도를 선택해 주세요.');
   if (safetyItems.some((item) => typeof safety?.[item.id] !== 'boolean')) throw new Error('건강 상태 문항에 모두 답해 주세요.');
@@ -100,15 +132,15 @@ export function parseBaseline(body, { age }) {
   const psqiResult = scorePsqi(psqi);
   if (!Number.isInteger(psqi.afterWakeMin) || psqi.afterWakeMin < 0 || psqi.afterWakeMin > 300) throw new Error('깬 뒤 침대에 있는 시간을 확인해 주세요.');
   const firstResult = scoreFirst(first);
-  const arousalScores = scoreArousal(arousal);
-  const beliefResult = scoreBeliefs(beliefs);
+  const arousalResult = scoreArousal(arousal);
+  const dbasResult = scoreDbas(dbas);
   const sleepMin = Math.round(psqi.sleepHours * 60);
   const tibMin = timeInBedMin(psqi);
   if (tibMin > 960) throw new Error('침대에 머무는 시간이 너무 깁니다. 입력한 시간을 확인해 주세요.');
   return {
-    isi, isiTotal, duration, frequency, safety, sex, psqi, psqiResult, first, firstResult, arousal, arousalScores, beliefResult,
+    isi, isiTotal, duration, frequency, safety, sex, psqi, psqiResult, first, firstResult, arousal, arousalResult, dbas, dbasResult,
     wake: psqi.wake, sleepMin, tibMin,
-    profile: buildProfile({ age, sex, isi, psqiResult, firstResult, arousalScores, beliefResult, sleepMin, tibMin }),
+    profile: buildProfile({ age, sex, isi, psqiResult, firstResult, arousal: arousalResult, dbas: dbasResult, sleepMin, tibMin }),
   };
 }
 
@@ -119,22 +151,79 @@ const AREA_INFO = {
   timeInBed: { reason: '침대에 머무는 시간이 김', title: '깬 뒤 바로 침대에서 나오기', detail: '아침에 눈을 뜨면 침대에 더 있지 말고 일어나요. 침대에서 쉬는 시간을 줄이는 연습이에요.', minutes: 2 },
   daytime: { reason: '낮 시간 피로', title: '낮 활동 하나 넣기', detail: '졸릴 때 눕는 대신 가볍게 걷거나 바깥 빛을 봐요. 위험한 작업과 운전은 졸릴 때 피해요.', minutes: 10 },
   worry: { reason: '수면에 대한 걱정', title: '걱정을 적어 두기', detail: '저녁 이른 시간에 잠에 관한 걱정을 적고, 내일 할 일 한 가지를 옆에 써요.', minutes: 10 },
-  somatic: { reason: '신체적 과각성', title: '몸의 긴장 풀기', detail: '잠들기 전 천천히 내쉬는 호흡이나 어깨 힘 빼기를 해 보세요.', minutes: 10 },
-  cognitive: { reason: '인지적 과각성', title: '생각 내려놓는 시간 갖기', detail: '생각을 억지로 막지 말고, 떠오른 생각을 종이에 옮긴 뒤 내일 다시 보기로 해요.', minutes: 10 },
   stress: { reason: '스트레스에 잠이 민감함', title: '스트레스 받은 날 저녁 루틴', detail: '힘든 일이 있었던 날은 잠들기 1시간 전부터 화면을 끄고 조용한 활동을 해요.', minutes: 15 },
-  beliefs: { reason: '수면에 대한 잘못된 믿음', title: '믿음 하나 다시 보기', detail: '설문에서 고른 생각 하나를 떠올리고, 그 생각과 다른 경험이 있었는지 적어 보세요.', minutes: 5 },
+  beliefs: { reason: '수면에 대한 잘못된 믿음(DBAS-16)', title: '믿음 하나 다시 보기', detail: '"8시간은 꼭 자야 한다"처럼 잠에 대한 생각 하나를 골라, 그 생각과 다른 경험이 있었는지 적어 보세요.', minutes: 5 },
   medication: { reason: '수면을 위한 약 사용', title: '약은 의사와 상의하기', detail: '이 프로그램 때문에 약을 스스로 줄이거나 끊지 마세요. 궁금한 점은 담당 의사와 상의해 주세요.', minutes: 2 },
 };
 
+const assignmentOf = (profile) => profile?.arousal?.assignment ?? null;
+
+// R5: 스트레스 반응성이 높으면 일지에 낮 스트레스 점수를 꼭 적는다.
+export const needsStressScore = (profile) => Boolean(assignmentOf(profile)?.rules.includes('R5'));
+
 // 플랜 본문을 만든 뒤 맞춤 과제를 붙인다. AI로 보내는 항목은 그대로이고, 이 단계는 이 서버 안에서만 일어난다.
 export function personalizeContent(content, profile, safety = {}) {
-  if (!content || !profile?.areas?.length) return content;
+  if (!content || !profile?.areas) return content;
   const areas = profile.areas.filter((id) => AREA_INFO[id]);
   const usable = areas.filter((id) => !(id === 'timeInBed' && safety.fallRisk));
+  // 4-4: A가 높으면 침대 밖 활동을 걱정 정리·이완과 연결한다.
+  const linkLeaveBed = profile.arousal?.bands?.A === 'high';
   const days = content.days.map((day, i) => {
-    if (!usable.length) return day;
+    const tasks = day.tasks.map((t) => (linkLeaveBed && /침대(에서 나오기|에 앉아)/.test(t.title) ? { ...t, detail: `${t.detail} ${moduleContent.leaveBedLink}` } : t));
+    if (!usable.length) return { ...day, tasks };
     const { title, detail, minutes } = AREA_INFO[usable[i % usable.length]];
-    return { ...day, tasks: [...day.tasks, { title: `맞춤: ${title}`, detail, minutes }] };
+    return { ...day, tasks: [...tasks, { title: `맞춤: ${title}`, detail, minutes }] };
   });
   return { ...content, days, personal: areas.map((id) => AREA_INFO[id].reason) };
+}
+
+// 모듈 화면에 쓰는 배정 결과. 시작·완료 기록은 사용 기록에서 읽는다.
+export function moduleView(profile, events, week) {
+  const assignment = assignmentOf(profile);
+  if (!assignment) return null;
+  const done = (id, event) => events.includes(`module-${id}-${event}`);
+  const status = (id) => ({ started: done(id, 'start'), completed: done(id, 'complete') });
+  const r = new Set(assignment.rules);
+  return {
+    group: assignment.group,
+    rules: assignment.rules,
+    scores: profile.arousal.scores,
+    bands: profile.arousal.bands,
+    basicOnly: r.has('R7'),
+    modules: r.has('R7') ? [] : ['worry', 'relax'].map((id) => ({ id, level: assignment.modules[id], ...status(id) })),
+    emergency: r.has('R5') ? status('emergency') : null,
+    daytimeRelax: r.has('R6'),
+    somaticNotice: r.has('R8'),
+    stressDiary: r.has('R5'),
+    relapse: r.has('R5') && week === 3,
+    restrictionCaution: profile.arousal.bands.A === 'high',
+  };
+}
+
+export const MODULE_IDS = ['worry', 'relax', 'emergency'];
+
+const BAND_LABEL = { low: '낮음', moderate: '중간', high: '높음' };
+const FIRST_LABEL = { nonreactive: '수면 비반응성 집단', moderate: '중간 수면 반응성 집단', high: '높은 수면 반응성 집단' };
+
+// 결과 화면의 변수별 결괏값. 진단이 아니라 응답과 기록을 정리한 것이다.
+export function resultVariables(profile, events, entries) {
+  if (!profile?.arousal?.assignment) return null;
+  const stressDays = entries.filter((e) => Number.isInteger(e.stress));
+  const avgSe = (rows) => (rows.length ? Math.round((rows.reduce((a, e) => a + e.se_pct, 0) / rows.length) * 10) / 10 : null);
+  const high = stressDays.filter((e) => e.stress >= 3);
+  const low = stressDays.filter((e) => e.stress <= 1);
+  const view = moduleView(profile, events, null);
+  return {
+    age: profile.age,
+    sex: profile.sex === 'female' ? '여성' : '남성',
+    arousal: Object.entries(profile.arousal.scores).map(([id, score]) => ({ id, score, band: BAND_LABEL[profile.arousal.bands[id]] })),
+    arousalGroup: profile.arousal.assignment.group,
+    rules: profile.arousal.assignment.rules,
+    modules: view.modules.map((m) => ({ id: m.id, level: m.level, started: m.started, completed: m.completed })),
+    first: { total: profile.firstTotal, group: FIRST_LABEL[profile.firstGroup] },
+    tibMin: profile.tibMin,
+    dbasMean: profile.dbas?.mean ?? null,
+    areas: profile.areas,
+    stress: high.length >= 2 && low.length >= 2 ? { highSe: avgSe(high), lowSe: avgSe(low), highDays: high.length, lowDays: low.length } : null,
+  };
 }

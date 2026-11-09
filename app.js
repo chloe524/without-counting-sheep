@@ -396,11 +396,10 @@ const readPsqi = (f, q) => {
 
 const pregnancyBlock = (info) => el('div', { class: 'notice stack' },
   el('p', {}, el('strong', {}, info.title)),
-  info.stages.map((stage) => el('div', { class: 'stack' },
-    el('p', {}, el('strong', {}, stage.name)),
-    el('ul', {}, stage.points.map((t) => el('li', {}, t))))),
-  el('p', {}, info.conclusion),
-  el('p', {}, '그래서 수면 시간 조절은 적용하지 않습니다. 잠이나 몸 상태가 걱정되면 담당 의사와 상담해 주세요.'));
+  info.body.map((t) => el('p', {}, t)),
+  el('p', {}, el('strong', {}, info.sitePolicy.title)),
+  el('ul', {}, info.sitePolicy.points.map((t) => el('li', {}, t))),
+  el('p', {}, info.sitePolicy.closing));
 
 function viewClassified(q, track) {
   const info = q.trackInfo[track];
@@ -418,7 +417,7 @@ async function viewBaseline() {
   const q = await loadQuestions();
   const startedAt = Date.now();
   const answers = {};
-  const TOTAL = 7;
+  const TOTAL = 8;
   const step = (n, title, content, onNext, { button = '다음' } = {}) => {
     const error = errorLine();
     show(el('main', { class: 'stack-lg' },
@@ -461,39 +460,48 @@ async function viewBaseline() {
     step6();
   });
   const step6 = () => step(6, '잠들기 전 몸과 마음의 상태', [
-    q.arousal.domains.map((d) => el('section', { class: 'stack' },
-      el('h2', {}, d.name),
-      el('p', { class: 'small muted' }, d.description),
-      d.items.map((text, i) => scaleField(`${d.id}_${i}`, text, q.arousal.scale, 1)))),
-    el('p', { class: 'small muted' }, q.arousal.corticalNote),
+    el('p', {}, `${q.arousal.recall} 동안을 떠올리며 답해 주세요.`),
+    el('p', { class: 'small muted' }, `0 = ${q.arousal.scale[0]}, 1 = ${q.arousal.scale[1]}, 2 = ${q.arousal.scale[2]}, 3 = ${q.arousal.scale[3]}, 4 = ${q.arousal.scale[4]}`),
+    q.arousal.subscales.map((sub) => el('section', { class: 'stack' },
+      el('h2', {}, sub.name),
+      el('p', { class: 'small muted' }, sub.when),
+      sub.items.map((item) => scaleField(item.id, item.text, q.arousal.scale.map((label, i) => `${i} ${label}`))))),
+    el('p', { class: 'small muted' }, `이 문항은 연구용으로 새로 만든 설계안이며 타당도가 검증되지 않았습니다.`),
   ], (f) => {
-    answers.arousal = Object.fromEntries(q.arousal.domains.map((d) => [d.id, d.items.map((_, i) => Number(formValue(f, `${d.id}_${i}`)))]));
+    answers.arousal = Object.fromEntries(q.arousal.subscales.flatMap((sub) => sub.items.map((item) => [item.id, Number(formValue(f, item.id))])));
     step7();
   });
-  const step7 = () => {
+  const step7 = () => step(7, '수면에 대한 생각', [
+    sourceNote(q.dbas, q.sources.draftNotice),
+    el('p', {}, '각 문장에 얼마나 동의하는지 0부터 10까지 골라 주세요.'),
+    el('p', { class: 'small muted' }, q.dbas.scaleNote),
+    q.dbas.items.map((item) => el('fieldset', {},
+      el('legend', {}, `${item.id}. ${item.text}`),
+      el('div', { class: 'scale numeric' }, Array.from({ length: 11 }, (_, v) => el('label', {},
+        el('input', { type: 'radio', name: `dbas_${item.id}`, value: String(v), required: true }),
+        el('span', {}, String(v))))))),
+  ], (f) => {
+    answers.dbas = q.dbas.items.map((item) => Number(formValue(f, `dbas_${item.id}`)));
+    step8();
+  });
+  const step8 = () => {
     const error = errorLine();
     const pregnancy = el('div', { hidden: true }, pregnancyBlock(q.pregnancyInfo));
     show(el('main', { class: 'stack-lg' },
       el('p', { class: 'steps' }, `기초 설문 ${TOTAL}/${TOTAL}`),
-      el('h1', {}, '수면에 대한 생각과 안전 확인'),
+      el('h1', {}, '안전을 위한 질문'),
       el('form', {
         class: 'stack-lg',
         onsubmit: submitter(error, async (e) => {
           const f = e.target;
           const safety = Object.fromEntries(q.safety.map((s) => [s.id, formValue(f, s.id) === 'yes']));
-          const beliefs = new FormData(f).getAll('belief');
-          const r = await api('/survey/baseline', { method: 'POST', body: { ...answers, beliefs, safety, elapsedSec: Math.round((Date.now() - startedAt) / 1000) } });
+          const r = await api('/survey/baseline', { method: 'POST', body: { ...answers, safety, elapsedSec: Math.round((Date.now() - startedAt) / 1000) } });
           state.me = null;
           if (r.excluded) go('#/');
           else viewClassified(q, r.track);
         }),
       },
-      el('fieldset', { class: 'stack' },
-        el('legend', {}, '평소 맞다고 생각하는 것을 모두 고르세요. 없으면 고르지 않아도 됩니다.'),
-        q.beliefs.map((b) => el('label', { class: 'check' }, el('input', { type: 'checkbox', name: 'belief', value: b.id }), el('span', {}, b.text)))),
-      el('section', { class: 'stack' },
-        el('h2', {}, '안전을 위한 질문'),
-        el('p', {}, '프로그램이 맞지 않거나 일부 안내를 빼야 하는 경우를 확인합니다. 진단이 아닙니다.')),
+      el('p', {}, '프로그램이 맞지 않거나 일부 안내를 빼야 하는 경우를 확인합니다. 진단이 아닙니다.'),
       q.safety.map((s) => el('fieldset', {},
         el('legend', {}, s.text),
         radioScale(s.id, [{ label: '아니요', value: 'no' }, { label: '예', value: 'yes' }], {
@@ -607,7 +615,8 @@ async function viewEducationModule(id) {
 // ---------- 오늘 ----------
 function windowHeadline(w) {
   if (w.mode === 'window') {
-    return el('p', { class: 'tonight' }, '오늘의 수면 시간', el('b', {}, `${w.bedtime} ~ ${w.wake}`));
+    return el('p', { class: 'tonight' }, '오늘의 수면 시간', el('b', {}, `${w.bedtime} ~ ${w.wake}`),
+      w.flexMin ? el('span', { class: 'small' }, `임신 중이라 취침·기상 시간은 30~${w.flexMin}분 정도 여유 있게 지켜도 괜찮아요.`) : null);
   }
   return el('p', { class: 'tonight' }, '일어나는 시간', el('b', {}, w.wake));
 }
@@ -620,6 +629,47 @@ function taskList(plan, dayIndex, day) {
       onchange: (e) => api(`/plan/${plan.id}/check`, { method: 'POST', body: { day: dayIndex, task: i, done: e.target.checked } }).catch(() => { e.target.checked = !e.target.checked; }),
     }),
     el('span', {}, el('strong', {}, t.title), t.detail, el('span', { class: 'small muted' }, ` 약 ${t.minutes}분`))));
+}
+
+const LEVEL_LABEL = { required: '필수', recommended: '권장', optional: '선택' };
+
+function moduleCard(id, title, level, status, content, extra = []) {
+  const record = (event) => api(`/modules/${id}/${event}`, { method: 'POST' }).then(() => route()).catch(() => {});
+  return el('section', { class: 'module stack' },
+    el('h3', {}, title, level ? el('span', { class: `badge ${level}` }, LEVEL_LABEL[level]) : null),
+    content,
+    extra,
+    el('div', { class: 'actions' },
+      status.completed
+        ? el('p', { class: 'small good' }, '완료했어요.')
+        : status.started
+          ? el('button', { class: 'btn ghost', type: 'button', onclick: () => record('complete') }, '완료했어요')
+          : el('button', { class: 'btn ghost', type: 'button', onclick: () => record('start') }, '시작하기')));
+}
+
+async function modulesSection(plan) {
+  const [{ view }, q] = await Promise.all([api('/modules'), loadQuestions()]);
+  if (!view) return null;
+  const m = q.modules;
+  const parts = [el('h2', {}, '맞춤 모듈')];
+  if (view.basicOnly) parts.push(el('p', {}, m.basicOnly));
+  for (const mod of view.modules) {
+    const c = m[mod.id];
+    const extra = mod.id === 'relax'
+      ? [view.daytimeRelax ? el('p', {}, m.daytimeRelax) : null, el('p', { class: 'small muted' }, c.stopNotice)]
+      : [];
+    parts.push(moduleCard(mod.id, c.title, mod.level, mod, [el('p', { class: 'muted' }, c.summary), el('ol', {}, c.steps.map((t) => el('li', {}, t)))], extra));
+  }
+  if (view.emergency) {
+    parts.push(moduleCard('emergency', m.emergency.title, null, view.emergency, el('ol', {}, m.emergency.steps.map((t) => el('li', {}, t)))));
+  }
+  const notes = [
+    view.somaticNotice ? m.somaticNotice : null,
+    view.stressDiary ? m.stressDiary : null,
+    view.relapse ? m.relapse : null,
+    plan.window.mode === 'window' ? m.restrictionCaution : null,
+  ].filter(Boolean);
+  return el('section', { class: 'stack' }, parts, notes.map((t) => el('p', { class: 'notice' }, t)));
 }
 
 async function viewToday() {
@@ -654,14 +704,15 @@ async function viewToday() {
       plan.content.days.map((d, i) => [el('p', { class: 'day-title' }, `${i + 1}일째: ${d.focus}`), taskList(plan, i, d)]));
   }
   const pregnancyNote = state.me.pregnant
-    ? el('details', {}, el('summary', {}, '임신 중이라 수면 시간 조절을 적용하지 않아요'), pregnancyBlock((await loadQuestions()).pregnancyInfo))
+    ? el('details', {}, el('summary', {}, '임신 중에는 수정된 방식으로 진행해요'), pregnancyBlock((await loadQuestions()).pregnancyInfo))
     : null;
   const personal = plan.content?.personal?.length
     ? el('details', {}, el('summary', {}, '내 맞춤 기준 보기'),
       el('p', { class: 'small' }, '설문에서 다음 부분이 두드러져 맞춤 과제를 넣었어요. 진단이 아닙니다.'),
       el('ul', {}, plan.content.personal.map((t) => el('li', {}, t))))
     : null;
-  show(el('main', { class: 'stack-lg' }, el('div', { class: 'stack' }, header), warnings, pregnancyNote, personal, diaryCta, chart, body));
+  const modules = await modulesSection(plan).catch(() => null);
+  show(el('main', { class: 'stack-lg' }, el('div', { class: 'stack' }, header), warnings, pregnancyNote, personal, diaryCta, chart, body, modules));
   // show()가 이전 타이머를 지우므로 화면을 그린 뒤에 건다.
   if (plan.status !== 'ready') pollTimer = setTimeout(route, 3000);
 }
@@ -686,8 +737,18 @@ async function viewPlan() {
 }
 
 // ---------- 일지 ----------
+// 낮 스트레스가 높은 날과 낮은 날의 수면 효율을 나란히 보여 준다(각 2일 이상일 때).
+function stressFeedback(entries) {
+  const rated = entries.filter((e) => Number.isInteger(e.stress));
+  const high = rated.filter((e) => e.stress >= 3);
+  const low = rated.filter((e) => e.stress <= 1);
+  if (high.length < 2 || low.length < 2) return el('p', { class: 'small muted' }, '스트레스가 높은 날과 낮은 날이 각각 2일 이상 쌓이면 잠과의 관계를 보여 드려요.');
+  const avg = (rows) => Math.round((rows.reduce((a, e) => a + e.se_pct, 0) / rows.length) * 10) / 10;
+  return el('p', { class: 'notice' }, `낮 스트레스가 높았던 날(${high.length}일)의 수면 효율은 평균 ${avg(high)}%, 낮았던 날(${low.length}일)은 ${avg(low)}%였어요.`);
+}
+
 async function viewDiaryList() {
-  const { entries, today } = await api('/diary');
+  const { entries, today, stressRequired } = await api('/diary');
   const plan = await api('/plan/current').then((r) => r.plan.window).catch(() => null);
   show(el('main', { class: 'stack-lg' },
     el('h1', {}, '수면 일지'),
@@ -695,13 +756,14 @@ async function viewDiaryList() {
     el('a', { class: 'btn', href: '#/diary/new' }, '일지 쓰기'),
     entries.length
       ? el('table', { class: 'kv' },
-        el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, '날짜'), el('th', { scope: 'col' }, '잔 시간'), el('th', { scope: 'col' }, '수면 효율'))),
-        el('tbody', {}, entries.map((e) => el('tr', {}, el('td', {}, e.night), el('td', {}, minutesToText(e.tst_min)), el('td', {}, `${e.se_pct}%`)))))
-      : el('p', { class: 'muted' }, '아직 적은 일지가 없어요. 일어난 뒤에 지난밤을 적어 보세요.')));
+        el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, '날짜'), el('th', { scope: 'col' }, '잔 시간'), el('th', { scope: 'col' }, '수면 효율'), stressRequired ? el('th', { scope: 'col' }, '낮 스트레스') : null)),
+        el('tbody', {}, entries.map((e) => el('tr', {}, el('td', {}, e.night), el('td', {}, minutesToText(e.tst_min)), el('td', {}, `${e.se_pct}%`), stressRequired ? el('td', {}, e.stress ?? '-') : null))))
+      : el('p', { class: 'muted' }, '아직 적은 일지가 없어요. 일어난 뒤에 지난밤을 적어 보세요.'),
+    stressRequired ? stressFeedback(entries) : null));
 }
 
 async function viewDiaryNew() {
-  const [{ entries, today }, sleep] = await Promise.all([api('/diary'), api('/sleep/status')]);
+  const [{ entries, today, stressRequired }, sleep] = await Promise.all([api('/diary'), api('/sleep/status')]);
   const last = entries[0];
   // 지난밤 수면 화면 기록이 있으면 시각을 미리 채워 둔다.
   const measured = sleep.last;
@@ -733,6 +795,7 @@ async function viewDiaryNew() {
             sleepiness: n('sleepiness'),
             danger: formValue(f, 'danger') === 'on',
             napMin: n('napMin'),
+            stress: stressRequired ? n('stress') : undefined,
             elapsedSec: Math.round((Date.now() - startedAt) / 1000),
           },
         });
@@ -756,6 +819,8 @@ async function viewDiaryNew() {
     el('fieldset', {}, el('legend', {}, '잠의 질은 어땠나요? (1 나쁨, 5 좋음)'), scale('quality')),
     el('fieldset', {}, el('legend', {}, '낮에 얼마나 졸렸나요? (1 거의 안 졸림, 5 매우 졸림)'), scale('sleepiness')),
     el('label', { class: 'check' }, el('input', { type: 'checkbox', name: 'danger' }), el('span', {}, '졸려서 운전, 작업, 이동 중에 위험했던 적이 있었어요.')),
+    stressRequired ? el('fieldset', {}, el('legend', {}, '어제 낮 스트레스는 어느 정도였나요? (0 없음, 4 매우 심함)'),
+      radioScale('stress', [0, 1, 2, 3, 4].map((v) => ({ value: v, label: String(v) })), { row: true })) : null,
     error,
     el('button', { class: 'btn', type: 'submit' }, '일지 저장하기'))));
 }
@@ -1186,6 +1251,33 @@ async function viewUsability() {
     el('button', { class: 'btn', type: 'submit' }, '설문 마치고 결과 보기'))));
 }
 
+const AREA_NAMES = {
+  onset: '잠들기 어려움', maintenance: '자다가 깸', earlyWaking: '너무 일찍 깸', timeInBed: '침대에 머무는 시간이 김', daytime: '낮 시간 피로',
+  worry: '수면에 대한 걱정', stress: '스트레스에 잠이 민감함', beliefs: '수면에 대한 잘못된 믿음', medication: '수면을 위한 약 사용',
+};
+const AROUSAL_NAMES = { A: '수면 전 인지적 각성', B: '수면 전 신체적 각성', C: '스트레스에 대한 수면 반응성', D: '낮 동안의 기본 긴장' };
+const MODULE_NAMES = { worry: '걱정 정리', relax: '이완' };
+
+// 변수 기반 결괏값. 진단이 아니라 응답과 기록을 정리한 것이다.
+function variablesSection(v) {
+  if (!v) return null;
+  const row = (k, val) => el('tr', {}, el('th', { scope: 'row' }, k), el('td', {}, val));
+  return el('section', { class: 'stack' },
+    el('h2', {}, '변수별 결과'),
+    el('table', { class: 'kv' }, el('tbody', {},
+      row('나이', `만 ${v.age}세`),
+      row('생물학적 성', v.sex),
+      v.arousal.map((a) => row(AROUSAL_NAMES[a.id], `${a.score}점, ${a.band}`)),
+      row('과각성 유형', v.arousalGroup === 'non_hyperarousal' ? '과각성 우세형 아님' : '과각성 우세형'),
+      row('스트레스 반응(FIRST)', `${v.first.total}점, ${v.first.group}`),
+      row('침대에 머무는 시간(시작할 때)', minutesToText(v.tibMin)),
+      v.dbasMean !== null ? row('수면에 대한 역기능적 믿음(DBAS-16)', `평균 ${v.dbasMean}점(0~10)`) : null,
+      row('취약 영역', v.areas.length ? v.areas.map((a) => AREA_NAMES[a] ?? a).join(', ') : '두드러진 영역 없음'),
+      v.modules.map((m) => row(`${MODULE_NAMES[m.id]} 모듈(${LEVEL_LABEL[m.level]})`, m.completed ? '완료' : m.started ? '시작했지만 완료하지 않음' : '시작하지 않음')))),
+    v.stress ? el('p', {}, `낮 스트레스가 높았던 날의 수면 효율은 평균 ${v.stress.highSe}%, 낮았던 날은 ${v.stress.lowSe}%였습니다.`) : null,
+    el('p', { class: 'small muted' }, '진단이 아니라 설문 응답과 기록을 정리한 결과입니다.'));
+}
+
 async function viewResults() {
   const r = await api('/results');
   const se = r.sePctWeek1 !== null && r.sePctWeek3 !== null
@@ -1207,6 +1299,7 @@ async function viewResults() {
       se,
       r.sleepNights ? el('p', {}, `수면 화면을 쓴 ${r.sleepNights}일 동안 화면이 켜져 있던 시간은 평균 ${minutesToText(r.avgOnMin)}, 느낀 수면 시간은 평균 ${minutesToText(r.avgPerceivedMin)}이었습니다.`) : null),
     r.suggestConsult ? el('p', { class: 'notice' }, '수면 어려움이 아직 크다고 답하셨어요. 의사와 상담해 보시기를 권합니다.') : null,
+    variablesSection(r.variables),
     el('p', {}, '참여해 주셔서 고맙습니다.'),
     logoutButton()));
 }
