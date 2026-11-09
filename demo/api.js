@@ -130,7 +130,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
     ['GET', /^\/public\/config$/, null, () => ({
       name: study.name,
       signupOpen: true,
-      draft: true,
+      draft: false,
       researcher: study.researcher,
     })],
 
