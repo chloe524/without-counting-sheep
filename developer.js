@@ -148,6 +148,7 @@ const minutes = (m) => {
   return h ? (r ? `${h}시간 ${r}분` : `${h}시간`) : `${r}분`;
 };
 const yes = (v) => (v ? '예' : '아니요');
+const duration = (sec) => (sec < 60 ? `${sec}초` : minutes(Math.round(sec / 60)));
 
 const STAGE = { survey: '기초 설문 전', education: '기초 교육 중', program: '플랜 진행 중', 'final-survey': '재설문 단계', usability: '사용성 설문 단계', done: '모두 마침' };
 const TRACK = { long: '만성 불면(3주 플랜)', short: '일시·단기 불면(6일 플랜)' };
@@ -195,7 +196,7 @@ function surveySections(d, c) {
     if (!r) return null;
     const isi = r.answers?.isi ?? [];
     return el('details', { open: true }, el('summary', {}, `${title}: ${r.score}점(0~28) · ${isiBand(r.score)}`),
-      sentence(`${kst(r.created_at)}에 답했습니다.`, r.elapsed_sec ? `작성에 ${minutes(r.elapsed_sec / 60)} 걸렸습니다.` : ''),
+      sentence(`${kst(r.created_at)}에 답했습니다.`, r.elapsed_sec ? `작성에 ${duration(r.elapsed_sec)} 걸렸습니다.` : ''),
       listOf(S.isiItems.map((q, i) => `${q.text} → ${q.scale[isi[i]] ?? '응답 없음'}(${isi[i] ?? '-'}점)`)));
   };
   out.push(isiBlock('baseline-isi', '불면증 심각도(ISI) 시작'));
@@ -349,7 +350,7 @@ async function viewDetail(code) {
       sentence(`아침 일지 알림 ${n.morning_enabled ? `${n.reminder_time}` : '끔'}, 자기 전 알림 ${n.bedtime_enabled ? (n.bedtime_time ?? '수면 시간 30분 전 자동') : '끔'}.`)) : null,
     el('section', { class: 'stack' },
       el('h2', {}, '사용 기록'),
-      d.usage?.length ? listOf(d.usage.map((u) => `${u.occurred_on} ${eventText(u.event)}${u.elapsed_sec ? `(입력 ${minutes(u.elapsed_sec / 60)})` : ''}`)) : el('p', { class: 'muted' }, '기록 없음')),
+      d.usage?.length ? listOf(d.usage.map((u) => `${u.occurred_on} ${eventText(u.event)}${u.elapsed_sec ? `(입력 ${duration(u.elapsed_sec)})` : ''}`)) : el('p', { class: 'muted' }, '기록 없음')),
     el('section', { class: 'stack danger-zone' },
       el('h2', {}, '참가자 삭제'),
       el('p', {}, '이 참가자의 계정과 모든 응답, 일지, 기록을 지웁니다. 되돌릴 수 없습니다.'),

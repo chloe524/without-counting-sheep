@@ -533,7 +533,16 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
     return flushing;
   };
 
-  async function handle(method, url, body) {
+  // 화면은 여러 요청을 동시에 보낸다. 각 요청이 저장소 전체를 읽고 쓰므로, 겹치면 나중 요청이 앞 요청의 변경을 덮어쓴다.
+  // 그래서 한 번에 하나씩 처리한다.
+  let queue = Promise.resolve();
+  const handle = (method, url, body) => {
+    const run = queue.then(() => handleOne(method, url, body));
+    queue = run.catch(() => {});
+    return run;
+  };
+
+  async function handleOne(method, url, body) {
     const { pathname, searchParams } = new URL(url, 'http://demo.invalid');
     if (pathname.startsWith('/admin')) return cloud.admin(pathname, body, method);
     const db = loadDb();
