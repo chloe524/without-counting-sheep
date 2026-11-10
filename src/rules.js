@@ -1,5 +1,5 @@
 // 점수 계산, 안전 판정, 수면 시간 규칙. AI 응답은 이 값들을 바꿀 수 없다.
-import { isiItems, safetyItems, susItems } from './content/survey.js?v=ec011d72a9';
+import { isiItems, safetyItems, susItems } from './content/survey.js?v=a24e33003c';
 
 export const PROGRAM_DAYS = 21;
 // 의료진 감독이 없는 환경이라 보수적으로 잡은 하한. 근거 확인 전까지 study.sleepFloorConfirmed는 false다.

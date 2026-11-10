@@ -1,5 +1,5 @@
 // 시연판과 Supabase 서버 기능 사이의 통신. 저장소가 잠시 안 되어도 사이트는 계속 쓸 수 있어야 한다.
-import { CLOUD_ORIGIN } from './cloud-config.js?v=ec011d72a9';
+import { CLOUD_ORIGIN } from './cloud-config.js?v=a24e33003c';
 
 const ADMIN_ACTIONS = { '/admin/status': 'status', '/admin/participants': 'list' };
 
@@ -16,6 +16,25 @@ export function createCloud({ fetchFn, tokenStore, baseUrl = `${CLOUD_ORIGIN}/fu
         return status === 200 ? data : null;
       } catch {
         return null;
+      }
+    },
+
+    // 이 기기의 푸시 구독을 등록한다. 성공하면 true.
+    async subscribePush(code, token, subscription) {
+      try {
+        return (await post('participant-sync', { action: 'subscribe', code, token, subscription })).status === 200;
+      } catch {
+        return false;
+      }
+    },
+
+    // 시험 푸시를 보낸다. 보낸 기기 수를 돌려준다.
+    async testPush(code, token) {
+      try {
+        const { status, data } = await post('participant-sync', { action: 'test-push', code, token });
+        return status === 200 ? data.push : 0;
+      } catch {
+        return 0;
       }
     },
 
@@ -64,6 +83,8 @@ export function createCloud({ fetchFn, tokenStore, baseUrl = `${CLOUD_ORIGIN}/fu
 
 export const offlineCloud = {
   check: async () => null,
+  subscribePush: async () => false,
+  testPush: async () => 0,
   deletedCodes: async () => [],
   sync: async () => false,
   admin: async () => ({ status: 503, data: { error: '저장소에 연결하지 못했습니다.' } }),

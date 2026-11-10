@@ -1,16 +1,17 @@
 // 공개 시연판의 서버 역할. src/app.js의 응답 형식을 따른다. 화면은 브라우저 저장소로 동작하고,
 // 바뀐 자료를 저장소(cloud)로 보내 개발자 모드에서 모든 참가자의 자료를 볼 수 있게 한다. 푸시와 이메일은 없다.
-import { offlineCloud } from './cloud.js?v=ec011d72a9';
-import { study } from '../src/content/study.js?v=ec011d72a9';
-import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=ec011d72a9';
-import { isiItems, surveyQuestions } from '../src/content/survey.js?v=ec011d72a9';
-import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=ec011d72a9';
-import { educationIds, educationModules } from '../src/content/education.js?v=ec011d72a9';
-import { fallbackPlan } from '../src/content/fallback-plans.js?v=ec011d72a9';
+import { offlineCloud } from './cloud.js?v=a24e33003c';
+import { VAPID_PUBLIC_KEY } from './cloud-config.js?v=a24e33003c';
+import { study } from '../src/content/study.js?v=a24e33003c';
+import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=a24e33003c';
+import { isiItems, surveyQuestions } from '../src/content/survey.js?v=a24e33003c';
+import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=a24e33003c';
+import { educationIds, educationModules } from '../src/content/education.js?v=a24e33003c';
+import { fallbackPlan } from '../src/content/fallback-plans.js?v=a24e33003c';
 import {
   addDays, classifyTrack, computeSleepWindow, countedSeconds, diaryExtras, diaryMetrics, evaluateSafety, kstDate, kstTime, nextOccurrenceIso, parseTime,
   programPosition, resolveBedtimeReminder, scoreIsi, scoreSus, sleepPattern, summarizeDiary,
-} from '../src/rules.js?v=ec011d72a9';
+} from '../src/rules.js?v=a24e33003c';
 
 const KEY = 'without-counting-sheep-demo-v1';
 const REMEMBER_MS = 28 * 24 * 3600 * 1000;
@@ -439,9 +440,9 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       wroteToday: today() in u.diary,
       sleeping: u.sleep.some((s) => s.status === 'active'),
       emailEnabled: false,
-      pushEnabled: false,
+      pushEnabled: Boolean(u.prefs.push_enabled),
       emailAvailable: false,
-      vapidPublicKey: null,
+      vapidPublicKey: cloud === offlineCloud ? null : VAPID_PUBLIC_KEY,
     })],
 
     ['POST', /^\/notifications$/, 'active', ({ u, body }) => {
@@ -452,11 +453,22 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       } catch {
         throw new HttpError(400, '알림 시간을 확인해 주세요.');
       }
-      u.prefs = { reminder_time: reminderTime, morning_enabled: Boolean(morningEnabled), bedtime_enabled: Boolean(bedtimeEnabled), bedtime_time: bedtimeAuto ? null : bedtimeTime };
+      u.prefs = { reminder_time: reminderTime, morning_enabled: Boolean(morningEnabled), bedtime_enabled: Boolean(bedtimeEnabled), bedtime_time: bedtimeAuto ? null : bedtimeTime, push_enabled: Boolean(body.pushEnabled) };
       return { ok: true };
     }],
 
-    ['POST', /^\/notifications\/test$/, 'active', () => ({ push: 0, email: false })],
+    ['POST', /^\/notifications\/test$/, 'active', async ({ u }) => ({ push: u.code ? await cloud.testPush(u.code, u.cloudToken) : 0, email: false })],
+
+    // 사이트를 닫아도 알림을 받도록 이 기기의 푸시 구독을 저장소에 등록한다. 계정이 먼저 저장소에 있어야 한다.
+    ['POST', /^\/notifications\/push$/, 'active', async ({ u, body }) => {
+      if (typeof body?.endpoint !== 'string' || !body.endpoint.startsWith('https://') || !body.keys) throw new HttpError(400, '알림 구독 정보가 잘못되었습니다.');
+      prepareForCloud(u);
+      if (await cloud.sync(cloudPayload(u)) !== true || !await cloud.subscribePush(u.code, u.cloudToken, body)) {
+        throw new HttpError(503, '알림을 등록하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.');
+      }
+      u.prefs = { ...u.prefs, push_enabled: true };
+      return { ok: true };
+    }],
 
     ['GET', /^\/sleep\/status$/, 'active', ({ u }) => ({
       ...sleepStatus(u),

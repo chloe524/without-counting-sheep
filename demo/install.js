@@ -1,6 +1,6 @@
 // 화면 코드(public/app.js)를 고치지 않고 /api 요청만 브라우저 안의 가짜 서버로 돌린다.
-import { createDemoApi } from './api.js?v=ec011d72a9';
-import { createCloud } from './cloud.js?v=ec011d72a9';
+import { createDemoApi } from './api.js?v=a24e33003c';
+import { createCloud } from './cloud.js?v=a24e33003c';
 
 const memory = new Map();
 const fallbackStorage = { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) };

@@ -1207,11 +1207,18 @@ const logoutButton = () => el('button', {
 
 const urlBase64ToUint8Array = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=')), (c) => c.charCodeAt(0));
 
+const isAppleMobile = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
 async function enablePush(publicKey) {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('이 브라우저는 푸시 알림을 지원하지 않습니다.');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    throw new Error(isAppleMobile() && !isStandalone()
+      ? '아이폰·아이패드는 Safari에서 공유 버튼 → "홈 화면에 추가"를 한 뒤, 홈 화면의 아이콘으로 열어야 푸시 알림을 켤 수 있어요.'
+      : '이 브라우저는 푸시 알림을 지원하지 않습니다.');
+  }
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') throw new Error('브라우저 설정에서 알림을 허용해 주세요.');
-  await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.register('./sw.js');
   // 등록 직후에는 아직 활성화 전이라 구독이 실패한다.
   const registration = await navigator.serviceWorker.ready;
   const sub = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
@@ -1232,6 +1239,7 @@ async function viewSettings() {
       el('h2', {}, '알림'),
       el('p', { class: 'small muted' }, '사이트를 열어 두면 화면에서 소리로 알려 드려요. 사이트를 닫아도 받으려면 푸시 알림을 켜 주세요.'),
       available ? null : el('p', { class: 'muted' }, '푸시와 이메일 발송이 아직 설정되지 않았습니다. 연구자에게 문의해 주세요.'),
+      n.vapidPublicKey && isAppleMobile() && !isStandalone() ? el('p', { class: 'notice' }, '아이폰·아이패드에서 사이트를 닫아도 알림을 받으려면, Safari 아래쪽 공유 버튼 → "홈 화면에 추가"를 누른 뒤 홈 화면에 생긴 아이콘으로 열어 푸시 알림을 켜 주세요(iOS 16.4 이상).') : null,
       el('form', {
         class: 'stack',
         onsubmit: submitter(error, async (e) => {
@@ -1459,7 +1467,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=ec011d72a9');
+      const { startDeveloper } = await import('./developer.js?v=a24e33003c');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();
