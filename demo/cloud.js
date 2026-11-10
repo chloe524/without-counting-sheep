@@ -19,6 +19,16 @@ export function createCloud({ fetchFn, tokenStore, baseUrl = `${CLOUD_ORIGIN}/fu
       }
     },
 
+    // 연구자가 지운 참가자 코드 목록. 확인하지 못하면 빈 목록이다.
+    async deletedCodes(codes) {
+      try {
+        const { status, data } = await post('participant-sync', { action: 'deleted', codes });
+        return status === 200 ? data.deleted : [];
+      } catch {
+        return [];
+      }
+    },
+
     // 성공하면 true, 연구자가 삭제한 참가자면 'deleted', 그 밖의 실패는 false
     async sync(payload) {
       try {
@@ -54,6 +64,7 @@ export function createCloud({ fetchFn, tokenStore, baseUrl = `${CLOUD_ORIGIN}/fu
 
 export const offlineCloud = {
   check: async () => null,
+  deletedCodes: async () => [],
   sync: async () => false,
   admin: async () => ({ status: 503, data: { error: '저장소에 연결하지 못했습니다.' } }),
 };

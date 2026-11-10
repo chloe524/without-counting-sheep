@@ -126,6 +126,18 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
   const moduleEvents = (u) => [...new Set((u.usage ?? []).map((e) => e.event).filter((e) => e.startsWith('module-')))];
   const latestPlanWindow = (u) => [...u.plans].sort((a, b) => b.week - a.week)[0]?.window ?? null;
 
+  // 연구자가 지운 계정은 이 브라우저에서도 지워, 같은 아이디와 이메일로 다시 가입할 수 있게 한다.
+  const purgeLocal = (db, ids) => {
+    db.users = db.users.filter((x) => !ids.includes(x.id));
+    if (db.session && ids.includes(db.session.userId)) db.session = null;
+  };
+  const purgeDeletedConflicts = async (db, matches) => {
+    const candidates = db.users.filter(matches).filter((x) => x.code);
+    if (!candidates.length) return;
+    const deleted = await cloud.deletedCodes(candidates.map((x) => x.code));
+    purgeLocal(db, candidates.filter((x) => deleted.includes(x.code)).map((x) => x.id));
+  };
+
   const routes = [
     ['GET', /^\/public\/config$/, null, () => ({
       name: study.name,
@@ -139,6 +151,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
     ['GET', /^\/auth\/check-username$/, null, async ({ db, query }) => {
       const username = query.get('username') ?? '';
       if (!USERNAME.test(username)) return { valid: false, available: false };
+      await purgeDeletedConflicts(db, (a) => a.username.toLowerCase() === username.toLowerCase());
       const remote = await cloud.check(username, null);
       return { valid: true, available: !remote?.usernameTaken && !db.users.some((a) => a.username.toLowerCase() === username.toLowerCase()) };
     }],
@@ -162,6 +175,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       }
       const wantsPhone = accepted.includes('II-3');
       if (wantsPhone && !PHONE.test(phone?.trim() ?? '')) throw new HttpError(400, '전화번호를 확인해 주세요.');
+      await purgeDeletedConflicts(db, (a) => a.username.toLowerCase() === username.toLowerCase() || a.email.toLowerCase() === email.toLowerCase());
       if (db.users.some((a) => a.username.toLowerCase() === username.toLowerCase())) throw new HttpError(409, '이미 쓰고 있는 아이디입니다.');
       if (db.users.some((a) => a.email.toLowerCase() === email.toLowerCase())) throw new HttpError(409, '이미 가입한 이메일입니다.');
       // 다른 사람의 브라우저에서 가입한 아이디와 이메일도 막는다.
@@ -517,8 +531,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
           const synced = await cloud.sync(cloudPayload(u));
           if (synced === 'deleted') {
             const db = loadDb();
-            const fresh = db.users.find((x) => x.id === userId);
-            if (fresh) Object.assign(fresh, { cloudDeleted: true, dirty: false });
+            purgeLocal(db, [userId]);
             storage.setItem(KEY, JSON.stringify(db));
             return;
           }
@@ -554,6 +567,8 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
     if (pathname.startsWith('/admin')) return cloud.admin(pathname, body, method);
     const db = loadDb();
     try {
+      // 이전 버전에서 '지워진 참가자'로 표시만 해 둔 계정을 정리한다.
+      purgeLocal(db, db.users.filter((x) => x.cloudDeleted).map((x) => x.id));
       db.users.forEach(prepareForCloud);
       for (const [routeMethod, pattern, guard, action] of routes) {
         const match = routeMethod === method && pattern.exec(pathname);
