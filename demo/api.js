@@ -4,7 +4,7 @@ import { offlineCloud } from './cloud.js';
 import { study } from '../src/content/study.js';
 import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js';
 import { isiItems, surveyQuestions } from '../src/content/survey.js';
-import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js';
+import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js';
 import { educationIds, educationModules } from '../src/content/education.js';
 import { fallbackPlan } from '../src/content/fallback-plans.js';
 import {
@@ -144,7 +144,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
     }],
 
     ['POST', /^\/auth\/signup$/, null, async ({ db, body }) => {
-      const { username, email, password, nickname, fullName, age, phone, consents, remember } = body ?? {};
+      const { username, email, password, nickname, fullName, age, phone, consents, remember, guardianName, guardianContact, guardianConsent } = body ?? {};
       const accepted = Array.isArray(consents) ? consents.filter((c) => allConsentIds().includes(c)) : [];
       if (requiredConsentIds().some((id) => !accepted.includes(id))) throw new HttpError(400, '필수 동의 항목에 모두 동의해 주세요.');
       if (!USERNAME.test(username ?? '')) throw new HttpError(400, '아이디는 영문, 숫자, 밑줄로 4~20자여야 합니다.');
@@ -153,7 +153,13 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       if (!nickname?.trim() || nickname.length > 20) throw new HttpError(400, '닉네임을 20자 이내로 입력해 주세요.');
       if (!fullName?.trim() || fullName.length > 50) throw new HttpError(400, '성명을 입력해 주세요.');
       if (!Number.isInteger(age) || age > 120) throw new HttpError(400, '연령을 숫자로 입력해 주세요.');
-      if (age < 14) throw new HttpError(400, '만 14세 이상만 참여할 수 있습니다.');
+      if (age < 1) throw new HttpError(400, '연령을 확인해 주세요.');
+      let guardian;
+      try {
+        guardian = parseGuardian({ age, guardianName, guardianContact, guardianConsent });
+      } catch (err) {
+        throw new HttpError(400, err.message);
+      }
       const wantsPhone = accepted.includes('II-3');
       if (wantsPhone && !PHONE.test(phone?.trim() ?? '')) throw new HttpError(400, '전화번호를 확인해 주세요.');
       if (db.users.some((a) => a.username.toLowerCase() === username.toLowerCase())) throw new HttpError(409, '이미 쓰고 있는 아이디입니다.');
@@ -168,7 +174,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       const user = {
         id: db.nextId, username, email, nickname: nickname.trim(), fullName: fullName.trim(), phone: wantsPhone ? phone.trim() : null,
         salt, hash: await hashPassword(password, salt),
-        age, consent_items: accepted, consent_at: iso(), stage: 'survey', track: null, safety: {},
+        age, guardian, consent_items: accepted, consent_at: iso(), stage: 'survey', track: null, safety: {},
         excluded_at: null, program_start: null, wake_time: null, baseline_sleep_min: null, baseline_tib_min: null,
         sleep_pattern: null, restriction_stopped_at: null, withdrawn_at: null,
         surveys: {}, education: {}, plans: [], diary: {}, sleep: [],
@@ -198,6 +204,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       advanceIfFinished(u);
       return {
         nickname: u.nickname,
+        age: u.age,
         stage: u.withdrawn_at ? 'withdrawn' : u.excluded_at ? 'excluded' : u.stage,
         track: u.track,
         position: u.program_start ? programPosition(u.program_start, today()) : null,
@@ -237,7 +244,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         stage: track === 'long' ? 'education' : 'program', excluded_at: verdict.excluded ? iso() : null,
       });
       if (track === 'short' && !verdict.excluded) startProgram(u);
-      return { track, excluded: verdict.excluded, crisis: verdict.crisis };
+      return { track, excluded: verdict.excluded, crisis: verdict.crisis, personalization: verdict.excluded ? null : personalizationSummary(b.profile, verdict, track) };
     }],
 
     ['GET', /^\/education$/, 'active', ({ u }) => ({

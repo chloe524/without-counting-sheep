@@ -297,7 +297,7 @@ async function viewDetail(code) {
         `수면 일지는 ${diary.length}일 적었습니다${avgSe !== null ? `(평균 수면 효율 ${avgSe}%)` : ''}.`)),
     el('section', { class: 'stack' },
       el('h2', {}, '연락처와 계정'),
-      facts([['성명', a.fullName], ['아이디', a.username], ['닉네임', a.nickname], ['이메일', a.email], ['전화번호', a.phone || '받지 않음'], ['만 나이', p.age !== undefined ? `${p.age}세` : ''], ['참가자 코드', code], ['가입', kst(a.createdAt)]])),
+      facts([['성명', a.fullName], ['아이디', a.username], ['닉네임', a.nickname], ['이메일', a.email], ['전화번호', a.phone || '받지 않음'], ['만 나이', p.age !== undefined ? `${p.age}세` : ''], (a.guardianName || p.guardian_name) ? ['보호자', `${a.guardianName || p.guardian_name}, ${a.guardianContact || p.guardian_contact}`] : null, ['참가자 코드', code], ['가입', kst(a.createdAt)]])),
     el('section', { class: 'stack' },
       el('h2', {}, '참여 상태'),
       facts([

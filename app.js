@@ -286,11 +286,28 @@ async function viewConsent() {
   syncAll();
 }
 
+const GUARDIAN_AGE = 14;
+const guardianNotice = () => el('p', { class: 'notice' }, `만 ${GUARDIAN_AGE}세 미만은 보호자와 함께 설문을 진행해 주세요. 보호자가 옆에서 문항을 함께 읽고, 답을 정하는 데 도와주세요.`);
+
 function viewSignup() {
   if (!state.signup) return go('#/');
   if (!state.consents) return go('#/consent');
   const wantsPhone = state.consents.includes('II-3');
   const error = errorLine();
+  const guardianFields = [
+    field('보호자 성명', el('input', { type: 'text', name: 'guardianName', autocomplete: 'off' })),
+    field('보호자 연락처(전화번호)', el('input', { type: 'tel', name: 'guardianContact', autocomplete: 'off' })),
+    el('label', { class: 'check' }, el('input', { type: 'checkbox', name: 'guardianConsent' }), el('span', {}, '보호자가 연구 참여 설명을 함께 읽고 동의했습니다.')),
+  ];
+  const guardianBox = el('div', { class: 'stack', hidden: true }, guardianNotice(), guardianFields);
+  const ageInput = el('input', {
+    type: 'number', name: 'age', required: true, min: 1, max: 120, inputMode: 'numeric',
+    oninput: (e) => {
+      const young = Number(e.target.value) > 0 && Number(e.target.value) < GUARDIAN_AGE;
+      guardianBox.hidden = !young;
+      for (const input of guardianBox.querySelectorAll('input[type=text], input[type=tel]')) input.required = young;
+    },
+  });
   show(el('main', { class: 'stack-lg' },
     el('h1', {}, '참가자 정보'),
     el('form', {
@@ -304,6 +321,9 @@ function viewSignup() {
             fullName: formValue(f, 'fullName'),
             age: Number(formValue(f, 'age')),
             phone: formValue(f, 'phone') ?? undefined,
+            guardianName: formValue(f, 'guardianName') ?? undefined,
+            guardianContact: formValue(f, 'guardianContact') ?? undefined,
+            guardianConsent: formValue(f, 'guardianConsent') === 'on',
             consents: state.consents,
           },
         });
@@ -312,7 +332,8 @@ function viewSignup() {
       }),
     },
     field('성명', el('input', { type: 'text', name: 'fullName', required: true, autocomplete: 'name' }), el('p', { class: 'hint' }, '설문 응답과 분리해 저장합니다.')),
-    field('만 나이', el('input', { type: 'number', name: 'age', required: true, min: 14, max: 120, inputMode: 'numeric' })),
+    field('만 나이', ageInput),
+    guardianBox,
     wantsPhone ? field('전화번호', el('input', { type: 'tel', name: 'phone', required: true, autocomplete: 'tel' }), el('p', { class: 'hint' }, '연구 진행에 필요한 연락에 씁니다.')) : null,
     error,
     el('button', { class: 'btn', type: 'submit' }, '가입하기'),
@@ -400,7 +421,27 @@ const pregnancyBlock = (info) => el('div', { class: 'notice stack' },
   el('ul', {}, info.sitePolicy.points.map((t) => el('li', {}, t))),
   el('p', {}, info.sitePolicy.closing));
 
-function viewClassified(q, track) {
+function viewPersonalized(p) {
+  show(el('main', { class: 'stack-lg' },
+    el('div', { class: 'stack' },
+      el('p', { class: 'steps' }, '설문을 모두 마쳤어요'),
+      el('h1', {}, '개인 맞춤형 플랜을 만들었어요'),
+      el('p', {}, '설문 응답에서 아래 6가지 변수를 보고 플랜과 수면 일지를 맞췄어요.')),
+    el('table', { class: 'kv' }, el('tbody', {}, p.variables.map((v) => el('tr', {},
+      el('th', { scope: 'row' }, v.name),
+      el('td', {}, el('strong', {}, v.value), el('br'), v.effect))))),
+    el('section', { class: 'stack' },
+      el('h2', {}, '설문에서 두드러진 부분'),
+      p.areas.length ? el('ul', {}, p.areas.map((t) => el('li', {}, t))) : el('p', {}, '두드러진 영역이 없어 기본 과제로 진행해요.'),
+      el('p', { class: 'small muted' }, '진단이 아니라 맞춤 과제를 고르는 기준이에요.')),
+    el('section', { class: 'stack' },
+      el('h2', {}, '나의 수면 일지'),
+      el('ul', {}, p.diary.map((t) => el('li', {}, t)))),
+    el('p', {}, el('strong', {}, p.next)),
+    el('button', { class: 'btn', type: 'button', onclick: () => { state.me = null; route(); } }, '시작하기')));
+}
+
+function viewClassified(q, track, personalization) {
   const info = q.trackInfo[track];
   show(el('main', { class: 'stack-lg' },
     el('div', { class: 'stack' },
@@ -409,7 +450,7 @@ function viewClassified(q, track) {
       info.details.map((t) => el('p', {}, t)),
       el('p', {}, el('strong', {}, info.plan)),
       el('p', { class: 'small muted' }, q.trackInfo.notice)),
-    el('button', { class: 'btn', type: 'button', onclick: () => { state.me = null; route(); } }, '계속하기')));
+    el('button', { class: 'btn', type: 'button', onclick: () => { if (personalization) viewPersonalized(personalization); else { state.me = null; route(); } } }, '계속하기')));
 }
 
 async function viewBaseline() {
@@ -421,6 +462,7 @@ async function viewBaseline() {
     const error = errorLine();
     show(el('main', { class: 'stack-lg' },
       el('p', { class: 'steps' }, `기초 설문 ${n}/${TOTAL}`),
+      state.me?.age < GUARDIAN_AGE ? guardianNotice() : null,
       el('h1', {}, title),
       el('form', {
         class: 'stack-lg',
@@ -487,6 +529,7 @@ async function viewBaseline() {
     const pregnancy = el('div', { hidden: true }, pregnancyBlock(q.pregnancyInfo));
     show(el('main', { class: 'stack-lg' },
       el('p', { class: 'steps' }, `기초 설문 ${TOTAL}/${TOTAL}`),
+      state.me?.age < GUARDIAN_AGE ? guardianNotice() : null,
       el('h1', {}, '안전을 위한 질문'),
       el('form', {
         class: 'stack-lg',
@@ -496,7 +539,7 @@ async function viewBaseline() {
           const r = await api('/survey/baseline', { method: 'POST', body: { ...answers, safety, elapsedSec: Math.round((Date.now() - startedAt) / 1000) } });
           state.me = null;
           if (r.excluded) go('#/');
-          else viewClassified(q, r.track);
+          else viewClassified(q, r.track, r.personalization);
         }),
       },
       el('p', {}, '프로그램이 맞지 않거나 일부 안내를 빼야 하는 경우를 확인합니다. 진단이 아닙니다.'),

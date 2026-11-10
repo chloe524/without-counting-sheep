@@ -227,3 +227,53 @@ export function resultVariables(profile, events, entries) {
     stress: high.length >= 2 && low.length >= 2 ? { highSe: avgSe(high), lowSe: avgSe(low), highDays: high.length, lowDays: low.length } : null,
   };
 }
+
+export const GUARDIAN_AGE = 14;
+
+// 만 14세 미만은 법정대리인(보호자)의 성명, 연락처, 동의 확인이 있어야 가입한다.
+export function parseGuardian({ age, guardianName, guardianContact, guardianConsent }) {
+  if (age >= GUARDIAN_AGE) return null;
+  if (typeof guardianName !== 'string' || !guardianName.trim() || guardianName.length > 50) throw new Error('보호자 성명을 입력해 주세요.');
+  if (typeof guardianContact !== 'string' || !/^[0-9+][0-9\s-]{8,19}$/.test(guardianContact.trim())) throw new Error('보호자 연락처(전화번호)를 확인해 주세요.');
+  if (guardianConsent !== true) throw new Error('보호자가 설명을 함께 읽고 동의했는지 확인해 주세요.');
+  return { name: guardianName.trim(), contact: guardianContact.trim(), confirmedAt: null };
+}
+
+const MODULE_NAME = { worry: '걱정 정리', relax: '이완' };
+
+// 설문을 마친 뒤 보여 주는 "개인 맞춤형 플랜" 요약. 변수 6개가 플랜과 일지를 어떻게 바꾸는지 문장으로 정리한다.
+export function personalizationSummary(profile, verdict, track) {
+  const view = moduleView(profile, [], 1);
+  const a = profile.arousal;
+  const bands = Object.entries(a.scores).map(([id, score]) => `${id} ${score}점(${BAND_LABEL[a.bands[id]]})`).join(', ');
+  const ageEffect = profile.age < 18
+    ? '만 18세 미만이라 수면 시간 조절 대신 기상 시간을 지키는 데 집중해요.'
+    : profile.age >= 65
+      ? '만 65세 이상이라 수면 시간 조절 대신 기상 시간을 지키고, 밤에 일어나 걷는 안내를 빼요.'
+      : '나이에 따른 제한 없이 진행해요.';
+  const sexEffect = verdict.pregnant
+    ? '임신 중이라고 답해서 수면 시간을 6시간 미만으로 줄이지 않고, 취침·기상 시간에 30~60분 여유를 둬요.'
+    : '분석에 쓰는 변수예요. 플랜 내용은 바꾸지 않아요.';
+  const arousalEffect = view.basicOnly
+    ? '과각성이 두드러지지 않아 기본 자극 조절과 수면 위생에 집중해요.'
+    : view.modules.map((m) => `${MODULE_NAME[m.id]} 모듈 ${{ required: '필수', recommended: '권장', optional: '선택' }[m.level]}`).join(', ')
+      + (view.emergency ? ', 스트레스 날 비상 루틴 제공' : '') + (view.daytimeRelax ? ', 낮 시간 이완 추가' : '') + '.';
+  const variables = [
+    { name: '나이', value: `만 ${profile.age}세`, effect: ageEffect },
+    { name: '생물학적 성', value: profile.sex === 'female' ? '여성' : '남성', effect: sexEffect },
+    { name: '과각성', value: bands, effect: arousalEffect },
+    { name: '스트레스 반응(FIRST)', value: `${profile.firstTotal}점, ${FIRST_LABEL[profile.firstGroup]}`, effect: profile.firstGroup === 'nonreactive' ? '스트레스 관련 과제를 따로 넣지 않아요.' : '스트레스 받은 날 저녁 루틴 과제를 넣어요.' },
+    { name: '침대에 머무는 시간', value: `${Math.floor(profile.tibMin / 60)}시간 ${profile.tibMin % 60}분`, effect: profile.areas.includes('timeInBed') ? '깬 뒤 바로 침대에서 나오는 과제를 넣어요.' : '수면 일지가 7일 쌓이면 실제 기록을 기준으로 다시 봐요.' },
+    { name: '수면에 대한 잘못된 믿음(DBAS-16)', value: `평균 ${profile.dbas.mean}점(0~10)`, effect: profile.dbas.high ? '잠에 대한 생각을 다시 보는 과제를 넣어요.' : '믿음 관련 과제는 넣지 않아요.' },
+  ];
+  const diary = ['합의 수면일지 9개 항목은 모든 참가자가 같아요.'];
+  if (view.stressDiary) diary.push('스트레스에 잠이 민감하게 반응하는 편이라, 매일 낮 스트레스 점수(0~4)도 함께 적어요.');
+  if (verdict.noRestriction || track !== 'long') diary.push('일지는 수면 시간 조절이 아니라 기상 시간과 수면 패턴을 살피는 데 써요.');
+  else diary.push('일지가 7일 이상 쌓이고 수면 효율이 85% 미만이면 2주차부터 수면 시간 조절을 시작해요.');
+  return {
+    variables,
+    areas: profile.areas.map((id) => AREA_INFO[id]?.reason ?? id),
+    diary,
+    next: track === 'long' ? '기초 교육을 마치면 이 기준으로 1주차 플랜이 만들어져요.' : '오늘부터 이 기준으로 만든 1주차 플랜을 시작해요.',
+  };
+}
