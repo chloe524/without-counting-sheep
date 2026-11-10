@@ -127,6 +127,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
   const latestPlanWindow = (u) => [...u.plans].sort((a, b) => b.week - a.week)[0]?.window ?? null;
 
   // 연구자가 지운 계정은 이 브라우저에서도 지워, 같은 아이디와 이메일로 다시 가입할 수 있게 한다.
+  const checkedDeletion = new Set();
   const purgeLocal = (db, ids) => {
     db.users = db.users.filter((x) => !ids.includes(x.id));
     if (db.session && ids.includes(db.session.userId)) db.session = null;
@@ -573,7 +574,16 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       for (const [routeMethod, pattern, guard, action] of routes) {
         const match = routeMethod === method && pattern.exec(pathname);
         if (!match) continue;
-        const u = db.session && db.session.expiresAt >= now().getTime() ? db.users.find((a) => a.id === db.session.userId) : null;
+        let u = db.session && db.session.expiresAt >= now().getTime() ? db.users.find((a) => a.id === db.session.userId) : null;
+        // 사이트를 열 때 한 번, 연구자가 이 계정을 지웠는지 확인한다. 지웠다면 이 브라우저에서도 지우고 로그아웃한다.
+        if (u?.code && pathname === '/me' && !checkedDeletion.has(u.code)) {
+          checkedDeletion.add(u.code);
+          if ((await cloud.deletedCodes([u.code])).includes(u.code)) {
+            purgeLocal(db, [u.id]);
+            storage.setItem(KEY, JSON.stringify(db));
+            u = null;
+          }
+        }
         if (guard && !u) throw new HttpError(401, '다시 로그인해 주세요.');
         if (guard === 'active') {
           if (u.withdrawn_at) throw new HttpError(403, '참여를 그만둔 계정입니다.');
