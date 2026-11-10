@@ -29,11 +29,11 @@ export const frequencyOptions = [
 
 // 항목은 연구자 초안이며 study.safetyItemsConfirmed로 확정 여부를 관리한다.
 // stop: 참여 불가(상담 안내), noRestriction: 수면 시간 조절 제외, fallRisk: 밤에 일어나 이동하는 안내 제외,
-// relaxCaution: 이완 실습 주의 안내, pregnancy: 임신 중 수정 규칙(수면 창 6시간 이상, 30~60분 유연성)
+// relaxCaution: 이완 실습 주의 안내, mental: 정신질환 안내 화면을 띄운다, pregnancy: 임신 중 수정 규칙(수면 창 6시간 이상, 30~60분 유연성)
 export const safetyItems = [
   { id: 'selfHarm', text: '최근 2주 안에 죽고 싶다는 생각이나 자해 생각이 든 적이 있다', effect: 'stop', crisis: true },
-  { id: 'bipolar', text: '양극성 장애(조울증) 진단을 받았거나 조증 삽화를 겪은 적이 있다', effect: 'stop' },
-  { id: 'psychosis', text: '조현병 등 정신병적 장애로 진료를 받고 있거나 받은 적이 있다', effect: 'stop' },
+  { id: 'bipolar', text: '양극성 장애(조울증) 진단을 받았거나 조증 삽화를 겪은 적이 있다', effect: 'stop', mental: true },
+  { id: 'psychosis', text: '조현병 등 정신병적 장애로 진료를 받고 있거나 받은 적이 있다', effect: 'stop', mental: true },
   { id: 'seizure', text: '뇌전증(발작) 진단을 받았다', effect: 'stop' },
     { id: 'otherSleep', text: '코골이와 함께 숨이 멎는다는 말을 들었거나, 잠들 때 다리가 불편해 움직이고 싶은 느낌이 자주 있다', effect: 'stop' },
   { id: 'unstable', text: '최근 상태가 불안정한 신체·정신 질환이 있다', effect: 'stop' },
@@ -41,7 +41,7 @@ export const safetyItems = [
   { id: 'pregnant', text: '현재 임신 중이다', effect: 'pregnancy' },
   { id: 'driving', text: '운전이나 위험한 기계 조작을 일상적으로 한다', effect: 'noRestriction' },
   { id: 'falls', text: '최근 넘어진 적이 있거나, 일어설 때 어지럽거나, 혼자 이동하기 어렵다', effect: 'fallRisk' },
-  { id: 'anxietyDep', text: '불안장애나 우울증으로 진료를 받고 있다', effect: 'relaxCaution' },
+  { id: 'anxietyDep', text: '불안장애나 우울증으로 진료를 받고 있다', effect: 'relaxCaution', mental: true },
 ];
 
 // System Usability Scale. 홀수 문항은 긍정, 짝수 문항은 부정 문장이다.
@@ -149,6 +149,35 @@ export const pregnancyInfo = {
   },
 };
 
+// 정신질환이 있다고 답했을 때 보여 주는 안내. 진단이 아니라 참여 기준에 따른 안내다.
+export const mentalHealthInfo = {
+  priority: {
+    title: '지금은 마음 건강 치료가 먼저예요',
+    body: [
+      '양극성 장애(조울증)나 조현병 같은 정신질환이 있으면, 잠 문제가 그 질환의 증상이거나 함께 나타나는 경우가 많아요. 그래서 불면만 따로 다루기보다 원래 질환을 먼저 치료하는 것이 우선이에요.',
+      '특히 이 프로그램의 수면 시간 조절(수면 제한)은 잠을 일부러 줄이는 방법이라, 양극성 장애에서는 조증 삽화를 일으킬 수 있고 정신병적 증상도 나빠질 수 있어요. 그래서 전문가의 관리 없이 혼자 따라 하지 않도록 이 프로그램에는 참여하지 않게 했어요.',
+    ],
+    actions: [
+      '진료를 받고 있다면, 담당 정신건강의학과 의사에게 잠 문제를 꼭 이야기해 주세요. 치료 계획 안에서 수면을 함께 다룰 수 있어요.',
+      '진료를 받고 있지 않다면, 가까운 정신건강의학과나 지역 정신건강복지센터에서 상담을 받아 보세요.',
+      '마음이 급하게 힘들어지면 정신건강위기상담전화 1577-0199(24시간)에 전화할 수 있어요.',
+    ],
+    closing: '이 안내는 진단이 아니에요. 이 결과로 어떤 불이익도 없어요.',
+  },
+  caution: {
+    title: '치료 중인 마음 건강 문제가 있다면',
+    body: [
+      '불안장애나 우울증으로 진료를 받고 있다고 답하셨어요. 이 경우에도 불면 프로그램을 함께 쓸 수 있지만, 지금 받고 있는 치료가 먼저예요.',
+    ],
+    actions: [
+      '이 프로그램을 시작한다고 담당 의사에게 알려 주세요. 약을 스스로 줄이거나 끊지 마세요.',
+      '이완 연습 중에 오히려 불안해지면 바로 멈추세요.',
+      '기분이나 불안이 눈에 띄게 나빠지면 프로그램을 멈추고 담당 의사와 상의해 주세요.',
+    ],
+    closing: '이 안내는 진단이 아니에요.',
+  },
+};
+
 // 화면이 쓰는 설문 묶음. 서버와 시연판이 같은 내용을 내려보낸다.
 export const surveyQuestions = () => ({
   isi: isiItems,
@@ -165,4 +194,5 @@ export const surveyQuestions = () => ({
   modules: moduleContent,
   trackInfo,
   pregnancyInfo,
+  mentalHealthInfo,
 });

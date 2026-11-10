@@ -539,6 +539,7 @@ async function viewBaseline() {
           const r = await api('/survey/baseline', { method: 'POST', body: { ...answers, safety, elapsedSec: Math.round((Date.now() - startedAt) / 1000) } });
           state.me = null;
           if (r.excluded) go('#/');
+          else if (r.mentalHealth === 'caution') viewMentalCaution(q, () => viewClassified(q, r.track, r.personalization));
           else viewClassified(q, r.track, r.personalization);
         }),
       },
@@ -556,15 +557,29 @@ async function viewBaseline() {
   step1();
 }
 
-function viewExcluded() {
+const mentalHealthBlock = (info) => el('div', { class: 'stack' },
+  el('h1', {}, info.title),
+  info.body.map((t) => el('p', {}, t)),
+  el('ul', {}, info.actions.map((t) => el('li', {}, t))),
+  el('p', { class: 'small muted' }, info.closing));
+
+async function viewExcluded() {
+  const mental = state.me.mentalHealth === 'priority' ? (await loadQuestions()).mentalHealthInfo.priority : null;
   show(el('main', { class: 'stack-lg' },
     state.me.crisis ? crisisInfo() : null,
-    el('div', { class: 'stack' },
+    mental ? mentalHealthBlock(mental) : el('div', { class: 'stack' },
       el('h1', {}, '이 프로그램에 참여하기 어렵습니다'),
       el('p', {}, '응답해 주신 내용을 보면, 이 프로그램의 안내가 안전하게 맞지 않을 수 있습니다. 진단이 아니라, 연구 참여 기준에 따른 안내입니다.'),
-      el('p', {}, '수면 때문에 힘들다면 의사와 상담해 주세요. 이 결과로 어떤 불이익도 없습니다.'),
-      el('p', { class: 'small muted' }, `궁금한 점은 연구자(${config.researcher.email})에게 문의해 주세요.`)),
+      el('p', {}, '수면 때문에 힘들다면 의사와 상담해 주세요. 이 결과로 어떤 불이익도 없습니다.')),
+    el('p', { class: 'small muted' }, `궁금한 점은 연구자(${config.researcher.email})에게 문의해 주세요.`),
     logoutButton()));
+}
+
+// 치료 중인 불안·우울처럼 참여는 가능한 경우, 분류 화면 전에 한 번 안내한다.
+function viewMentalCaution(q, next) {
+  show(el('main', { class: 'stack-lg' },
+    mentalHealthBlock(q.mentalHealthInfo.caution),
+    el('button', { class: 'btn', type: 'button', onclick: next }, '확인했어요, 계속하기')));
 }
 
 // ---------- 기초 교육 ----------
@@ -1392,7 +1407,7 @@ async function route() {
     if (state.me.sleep?.active) return viewSleepScreen(state.me.sleep.active);
     if (hash === '#/sleep/morning' && stage !== 'withdrawn' && stage !== 'excluded') return await viewSleepMorning();
     if (stage === 'withdrawn') return viewWithdrawn();
-    if (stage === 'excluded') return viewExcluded();
+    if (stage === 'excluded') return await viewExcluded();
     if (stage === 'survey') return await viewBaseline();
     if (stage === 'education') {
       const m = /^#\/education\/([\w-]+)$/.exec(hash);

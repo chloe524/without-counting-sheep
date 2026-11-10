@@ -34,6 +34,8 @@ export function evaluateSafety(answers, { age }) {
     fallRisk: senior || hit.some((i) => i.effect === 'fallRisk'),
     relaxCaution: hit.some((i) => i.effect === 'relaxCaution'),
     pregnant: answers?.pregnant === true,
+    // 정신질환 문항에 '예'로 답한 경우. 참여 제외(stop)면 치료 우선 안내, 아니면 주의 안내를 보여 준다.
+    mentalHealth: hit.some((i) => i.mental) ? (hit.some((i) => i.mental && i.effect === 'stop') ? 'priority' : 'caution') : null,
   };
 }
 

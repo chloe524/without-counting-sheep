@@ -210,6 +210,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         position: u.program_start ? programPosition(u.program_start, today()) : null,
         today: today(),
         crisis: Boolean(u.safety.crisis),
+        mentalHealth: u.safety.mentalHealth ?? null,
         relaxCaution: Boolean(u.safety.relaxCaution),
         pregnant: Boolean(u.safety.pregnant),
         restrictionStopped: Boolean(u.restriction_stopped_at),
@@ -244,7 +245,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         stage: track === 'long' ? 'education' : 'program', excluded_at: verdict.excluded ? iso() : null,
       });
       if (track === 'short' && !verdict.excluded) startProgram(u);
-      return { track, excluded: verdict.excluded, crisis: verdict.crisis, personalization: verdict.excluded ? null : personalizationSummary(b.profile, verdict, track) };
+      return { track, excluded: verdict.excluded, crisis: verdict.crisis, mentalHealth: verdict.mentalHealth, personalization: verdict.excluded ? null : personalizationSummary(b.profile, verdict, track) };
     }],
 
     ['GET', /^\/education$/, 'active', ({ u }) => ({
