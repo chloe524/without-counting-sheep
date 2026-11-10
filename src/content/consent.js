@@ -11,7 +11,6 @@ export function consentDocument(config = study) {
       '이 웹사이트는 연구용 시제품이며, 의사의 처방으로 쓰는 디지털 치료제가 아닙니다.',
       '불면증을 진단하거나 치료하지 않습니다. 참여 전후 수면 설문 응답을 비교하지만, 진단이나 치료 효과를 판단하지는 않습니다.',
       '참여 기간은 약 3주이며, 수면 일지 작성에 하루 약 5분이 걸립니다.',
-      '동의한 경우에만 수면 계획을 만들기 위해 수면 수치 일부를 미국의 AI 회사 Anthropic으로 보냅니다. 동의하지 않아도 참여할 수 있고, AI 없는 기본 계획을 받습니다. 이름과 연락처는 보내지 않습니다.',
       '참여는 자발적이며, 언제든 그만둘 수 있습니다.',
       '기록을 제대로 작성하지 않거나 사실과 다르게 적거나 수면 화면을 끄면 수면 시간이 측정되지 않아 결과가 부정확해지고, 해당 자료가 분석에서 제외될 수 있습니다.',
     ],
@@ -50,8 +49,6 @@ export function consentDocument(config = study) {
               `연구로 인해 피해가 생기면 보상하는 방법: ${pending('IRB 규정에 따른 피해 보상 방법', config.injuryCompensation)}`,
             ],
           },
-          { h: 'AI를 사용한 플랜 생성' },
-          { p: '동의한 경우 주차별 계획을 만들 때 Claude API를 사용합니다. 플랜 유형, 주차, 수면 설문 총점, 수면 일지 평균값, 안전 관련 제한 사항이 미국의 Anthropic으로 전송됩니다. 성명, 이메일, 전화번호, 아이디, 닉네임, 자유 입력 내용은 전송하지 않습니다. 동의하지 않으면 전송하지 않고 AI 없는 기본 계획을 제공합니다.' },
           { h: '개인정보 보호' },
           { p: '이름과 연락처는 설문 응답과 분리해 저장합니다. 연구자는 참여 관리와 안전 확인을 위해 비밀번호로 보호된 관리 화면에서 이 정보를 함께 볼 수 있으며, 다른 사람은 볼 수 없습니다. 분석에는 참가자 코드만 사용하고, 결과를 발표할 때 개인을 알아볼 수 있는 정보는 포함하지 않습니다.' },
           { h: '자발적 참여와 철회' },
@@ -83,7 +80,7 @@ export function consentDocument(config = study) {
         ],
       },
       {
-        title: '3부 건강정보(민감정보) 수집·이용 및 국외 이전 안내',
+        title: '3부 건강정보(민감정보) 수집·이용 안내',
         blocks: [
           { p: '수면·건강 상태에 관한 정보는 민감정보에 해당하므로, 개인정보와 별도로 동의를 받습니다.' },
           {
@@ -93,14 +90,6 @@ export function consentDocument(config = study) {
               ['보유·이용 기간', retention],
               ['동의 거부권과 불이익', '동의를 거부할 수 있습니다. 거부하면 수면·건강 정보를 받을 수 없어 이 연구에 참여할 수 없습니다. 그 이외의 불이익은 없습니다.'],
               ...(config.storageNotice ? [['자료 보관', config.storageNotice]] : []),
-              ['국외 이전: 받는 곳', 'Anthropic PBC'],
-              ['이전 국가', '미국'],
-              ['이전 항목', '플랜 유형, 주차, 수면 설문 총점, 수면 일지 평균값(수면 시간, 침대 시간, 수면 효율, 잠들기까지 걸린 시간), 안전 관련 제한 사항'],
-              ['이전 시기', '주차별 계획을 만들 때마다'],
-              ['이전 방법', '암호화된 인터넷 통신으로 전송'],
-              ['이용 목적', 'AI 수면 계획 생성'],
-              ['보유 기간', pending('Anthropic 데이터 보유 기간', config.anthropicRetention)],
-              ['거부 방법과 효과', 'Ⅲ-6에 동의하지 않으면 전송하지 않습니다. AI 없는 기본 계획을 받으며, 이를 이유로 참여가 제한되지 않습니다. 참여 중에는 설정의 "참여 그만두기"로 이후 전송을 멈출 수 있습니다.'],
             ],
           },
         ],
@@ -127,8 +116,6 @@ export function consentDocument(config = study) {
           { id: 'II-3', label: 'Ⅱ-3', required: false, text: '전화번호를 수집하는 것에 동의합니다.', basis: '제22조 제5항, 제16조' },
           { id: 'II-4', label: 'Ⅱ-4', required: true, text: `수집한 개인정보를 학술제 종료 시까지(${config.retentionEnd}) 보유·이용하고, 기간이 지나면 파기하는 것에 동의합니다.`, basis: '제15조 제2항 제3호' },
           { id: 'II-5', label: 'Ⅱ-5', required: true, text: '동의를 거부할 수 있고, 거부하면 이 연구에 참여할 수 없다는 점을 이해했습니다. 그 이외의 불이익은 없습니다.', basis: '제15조 제2항 제4호' },
-          // 원문에 번호와 필수·선택 표시가 없는 고지 확인 항목. AI 전송(Ⅲ-6)에 동의하려면 함께 확인해야 한다.
-          { id: 'AI-NOTICE', required: false, untagged: true, text: '수면 정보가 AI 수면 계획 생성을 위해 미국의 Anthropic으로 전송된다는 점과 3부 표의 내용(받는 곳, 이전 국가·항목·시기·방법, 이용 목적, 보유 기간, 거부 방법과 효과)을 확인했습니다.', basis: '제28조의8 제2항' },
         ],
       },
       {
@@ -140,8 +127,6 @@ export function consentDocument(config = study) {
           { id: 'III-3', label: 'Ⅲ-3', required: true, text: `수집한 수면·건강 정보를 학술제 종료 시까지(${config.retentionEnd}) 보유·이용하고, 기간이 지나면 파기하는 것에 동의합니다.`, basis: '제23조, 제15조 제2항 제3호' },
           { id: 'III-4', label: 'Ⅲ-4', required: true, text: '동의를 거부할 수 있고, 거부하면 수면·건강 정보를 받을 수 없어 이 연구에 참여할 수 없다는 점을 이해했습니다. 그 이외의 불이익은 없습니다.', basis: '제23조, 제15조 제2항 제4호' },
           { id: 'III-5', label: 'Ⅲ-5', required: true, text: '개인정보(Ⅱ)와 별도로, 건강정보(민감정보) 수집·이용에 동의합니다.', basis: '제23조, 제22조 제1항' },
-          // 원문 표시는 [필수]지만 문장대로 거부해도 참여할 수 있어야 하므로 선택으로 둔다.
-          { id: 'III-6', label: 'Ⅲ-6', required: false, text: '수면·건강정보(민감정보)를 AI 수면 계획 생성을 위해 미국의 Anthropic으로 전송하는 것에 동의합니다. 동의하지 않으면 AI 없는 기본 계획을 받으며, 이를 이유로 참여가 제한되지 않습니다.', basis: '제28조의8 제1항 제1호, 제23조, 제22조 제5항' },
         ],
       },
     ],
@@ -152,7 +137,7 @@ export function requiredConsentIds(doc = consentDocument()) {
   return doc.groups.flatMap((g) => g.items.filter((i) => i.required).map((i) => i.id));
 }
 
-// AI 전송은 고지 확인과 전송 동의가 모두 있을 때만 허용한다.
+// AI 전송은 고지 확인과 전송 동의가 모두 있을 때만 허용한다. 지금은 Claude API를 쓰지 않아 동의서에서 두 항목을 뺐으므로 항상 거부된다.
 export const AI_CONSENT_IDS = ['AI-NOTICE', 'III-6'];
 export const allowsAiTransfer = (accepted) => AI_CONSENT_IDS.every((id) => accepted.includes(id));
 

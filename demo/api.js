@@ -1,5 +1,5 @@
 // 공개 시연판의 서버 역할. src/app.js의 응답 형식을 따른다. 화면은 브라우저 저장소로 동작하고,
-// 바뀐 자료를 저장소(cloud)로 보내 개발자 모드에서 모든 참가자의 자료를 볼 수 있게 한다. AI 계획, 푸시, 이메일은 없다.
+// 바뀐 자료를 저장소(cloud)로 보내 개발자 모드에서 모든 참가자의 자료를 볼 수 있게 한다. 푸시와 이메일은 없다.
 import { offlineCloud } from './cloud.js';
 import { study } from '../src/content/study.js';
 import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js';
@@ -154,7 +154,6 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       if (!fullName?.trim() || fullName.length > 50) throw new HttpError(400, '성명을 입력해 주세요.');
       if (!Number.isInteger(age) || age > 120) throw new HttpError(400, '연령을 숫자로 입력해 주세요.');
       if (age < 14) throw new HttpError(400, '만 14세 이상만 참여할 수 있습니다.');
-      if (accepted.includes('III-6') !== accepted.includes('AI-NOTICE')) throw new HttpError(400, 'AI 전송에 동의하려면 전송 내용 확인과 Ⅲ-6에 함께 표시해 주세요.');
       const wantsPhone = accepted.includes('II-3');
       if (wantsPhone && !PHONE.test(phone?.trim() ?? '')) throw new HttpError(400, '전화번호를 확인해 주세요.');
       if (db.users.some((a) => a.username.toLowerCase() === username.toLowerCase())) throw new HttpError(409, '이미 쓰고 있는 아이디입니다.');

@@ -264,7 +264,6 @@ async function viewConsent() {
       const checked = new FormData(e.target).getAll('consent');
       const missing = doc.groups.flatMap((g) => g.items).filter((i) => i.required && !checked.includes(i.id));
       if (missing.length) throw new Error(`필수 항목 ${missing.length}개에 아직 동의하지 않았습니다.`);
-      if (checked.includes('III-6') !== checked.includes('AI-NOTICE')) throw new Error('AI 전송에 동의하려면 전송 내용 확인과 Ⅲ-6에 함께 표시해 주세요. 동의하지 않으려면 둘 다 비워 두세요.');
       state.consents = checked;
       go('#/signup');
     }),
@@ -1168,7 +1167,7 @@ async function viewSettings() {
     el('section', { class: 'stack' }, logoutButton()),
     el('section', { class: 'stack' },
       el('h2', {}, '참여 그만두기'),
-      el('p', {}, '언제든 이유 없이 그만둘 수 있고, 불이익은 없습니다. 그만두면 알림과 AI 플랜 생성이 멈춥니다.'),
+      el('p', {}, '언제든 이유 없이 그만둘 수 있고, 불이익은 없습니다. 그만두면 알림이 멈춥니다.'),
       el('form', {
         class: 'stack',
         onsubmit: submitter(withdrawError, async (e) => {
