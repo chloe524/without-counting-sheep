@@ -50,6 +50,22 @@ export const formatTime = (min) => {
 
 const nightSpan = (from, to) => ((parseTime(to) - parseTime(from) + 1440) % 1440);
 
+export const DIARY_NOTES_MAX = 500;
+
+// 합의 수면일지(CSD) 7번 "최종적으로 깨어난 후 침대에 있던 시간"으로 침대에서 나온 시각을 구하고, 9번 특이사항을 정리한다.
+export function diaryExtras({ finalWake, outOfBed, afterWakeMin, notes }) {
+  let result = { outOfBed, afterWakeMin: null, notes: null };
+  if (afterWakeMin !== undefined && afterWakeMin !== null) {
+    if (!Number.isInteger(afterWakeMin) || afterWakeMin < 0 || afterWakeMin > 300) throw new Error('최종적으로 깬 뒤 침대에 있던 시간을 확인해 주세요.');
+    result = { ...result, afterWakeMin, outOfBed: formatTime(parseTime(finalWake) + afterWakeMin) };
+  }
+  if (notes !== undefined && notes !== null) {
+    if (typeof notes !== 'string' || notes.length > DIARY_NOTES_MAX) throw new Error(`특이사항은 ${DIARY_NOTES_MAX}자 이내로 적어 주세요.`);
+    result.notes = notes.trim() || null;
+  }
+  return result;
+}
+
 export function diaryMetrics({ bedtime, sleepTry, latencyMin, wasoMin, finalWake, outOfBed }) {
   const tib = nightSpan(bedtime, outOfBed);
   const tryDelay = nightSpan(bedtime, sleepTry);

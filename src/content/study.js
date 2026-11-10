@@ -2,7 +2,7 @@
 // NODE_ENV=production 이면 미확정 항목이 하나라도 남아 있을 때 신규 가입을 막는다.
 export const study = {
   name: 'without counting sheep; for your stable health',
-  consentVersion: '2026-11-07-draft5-cloud',
+  consentVersion: '2026-11-10-draft6-cloud',
   retentionEnd: '2026년 12월 28일',
   researcher: { email: '시연판 비공개', phone: '시연판 비공개' },
   storageNotice: 'Supabase, Inc.가 운영하는 저장소의 서울 지역 서버에 저장합니다. 연구자만 비밀번호로 보호된 관리 화면에서 볼 수 있습니다. 위탁·국외 이전 해당 여부는 확인 중입니다.',

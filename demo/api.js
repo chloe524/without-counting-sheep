@@ -8,7 +8,7 @@ import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, personalizeCon
 import { educationIds, educationModules } from '../src/content/education.js';
 import { fallbackPlan } from '../src/content/fallback-plans.js';
 import {
-  addDays, classifyTrack, computeSleepWindow, countedSeconds, diaryMetrics, evaluateSafety, kstDate, kstTime, nextOccurrenceIso, parseTime,
+  addDays, classifyTrack, computeSleepWindow, countedSeconds, diaryExtras, diaryMetrics, evaluateSafety, kstDate, kstTime, nextOccurrenceIso, parseTime,
   programPosition, resolveBedtimeReminder, scoreIsi, scoreSus, sleepPattern, summarizeDiary,
 } from '../src/rules.js';
 
@@ -308,8 +308,10 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         if (!Number.isInteger(b[key]) || b[key] < min || b[key] > max) throw new HttpError(400, '입력한 숫자를 확인해 주세요.');
       }
       let m;
+      let extras;
       try {
-        m = diaryMetrics(b);
+        extras = diaryExtras(b);
+        m = diaryMetrics({ ...b, outOfBed: extras.outOfBed });
       } catch (err) {
         throw new HttpError(400, err.message);
       }
@@ -318,7 +320,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       if (needsStressScore(u.surveys.profile?.answers) && !Number.isInteger(b.stress)) throw new HttpError(400, '낮 스트레스 점수를 적어 주세요.');
       u.diary[b.night] = {
         night: b.night, bedtime: b.bedtime, sleep_try: b.sleepTry, latency_min: b.latencyMin, awakenings: b.awakenings, waso_min: b.wasoMin,
-        final_wake: b.finalWake, out_of_bed: b.outOfBed, quality: b.quality, sleepiness: b.sleepiness, danger: danger ? 1 : 0, nap_min: b.napMin,
+        final_wake: b.finalWake, out_of_bed: extras.outOfBed, after_wake_min: extras.afterWakeMin, notes: extras.notes, quality: b.quality, sleepiness: b.sleepiness, danger: danger ? 1 : 0, nap_min: b.napMin,
         tib_min: m.tibMin, tst_min: m.tstMin, se_pct: m.sePct, elapsed_sec: elapsedOf(b), saved_at: iso(), stress: Number.isInteger(b.stress) ? b.stress : null,
       };
       let restrictionStopped = false;
