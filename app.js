@@ -466,7 +466,6 @@ async function viewBaseline() {
       el('h2', {}, sub.name),
       el('p', { class: 'small muted' }, sub.when),
       sub.items.map((item) => scaleField(item.id, item.text, q.arousal.scale.map((label, i) => `${i} ${label}`))))),
-    el('p', { class: 'small muted' }, `이 문항은 연구용으로 새로 만든 설계안이며 타당도가 검증되지 않았습니다.`),
   ], (f) => {
     answers.arousal = Object.fromEntries(q.arousal.subscales.flatMap((sub) => sub.items.map((item) => [item.id, Number(formValue(f, item.id))])));
     step7();
