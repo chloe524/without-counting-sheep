@@ -19,16 +19,18 @@ export function createCloud({ fetchFn, tokenStore, baseUrl = `${CLOUD_ORIGIN}/fu
       }
     },
 
+    // 성공하면 true, 연구자가 삭제한 참가자면 'deleted', 그 밖의 실패는 false
     async sync(payload) {
       try {
-        return (await post('participant-sync', { action: 'sync', ...payload })).status === 200;
+        const { status } = await post('participant-sync', { action: 'sync', ...payload });
+        return status === 410 ? 'deleted' : status === 200;
       } catch {
         return false;
       }
     },
 
     // 개발자 화면이 쓰는 /admin 주소를 서버 기능 요청으로 바꾼다.
-    async admin(path, body) {
+    async admin(path, body, method = 'GET') {
       try {
         if (path === '/admin/logout') {
           tokenStore.set(null);
@@ -40,7 +42,7 @@ export function createCloud({ fetchFn, tokenStore, baseUrl = `${CLOUD_ORIGIN}/fu
           return { status: result.status, data: result.status === 200 ? { ok: true } : result.data };
         }
         const code = /^\/admin\/participants\/([\w-]+)$/.exec(path)?.[1];
-        const action = code ? 'detail' : ADMIN_ACTIONS[path];
+        const action = code ? (method === 'DELETE' ? 'delete' : 'detail') : ADMIN_ACTIONS[path];
         if (!action) return { status: 404, data: { error: '없는 주소입니다.' } };
         return await post('developer-admin', { action, code, token: tokenStore.get() });
       } catch {

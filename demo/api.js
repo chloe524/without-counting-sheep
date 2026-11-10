@@ -496,7 +496,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
 
   // 식별 정보와 연구 자료를 나누어 보낸다. 비밀번호 해시와 토큰은 연구 자료에 넣지 않는다.
   const cloudPayload = (u) => {
-    const { id, username, email, nickname, fullName, phone, salt, hash, code, cloudToken, dirty, rev, ...record } = u;
+    const { id, username, email, nickname, fullName, phone, salt, hash, code, cloudToken, dirty, rev, cloudDeleted, ...record } = u;
     return { code, token: cloudToken, identity: { username, email, nickname, fullName, phone }, record };
   };
 
@@ -506,8 +506,16 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       try {
         for (;;) {
           const u = loadDb().users.find((a) => a.id === userId);
-          if (!u?.dirty) return;
-          if (!await cloud.sync(cloudPayload(u))) return;
+          if (!u?.dirty || u.cloudDeleted) return;
+          const synced = await cloud.sync(cloudPayload(u));
+          if (synced === 'deleted') {
+            const db = loadDb();
+            const fresh = db.users.find((x) => x.id === userId);
+            if (fresh) Object.assign(fresh, { cloudDeleted: true, dirty: false });
+            storage.setItem(KEY, JSON.stringify(db));
+            return;
+          }
+          if (!synced) return;
           const db = loadDb();
           const fresh = db.users.find((a) => a.id === userId);
           if (fresh?.rev === u.rev) {
@@ -527,7 +535,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
 
   async function handle(method, url, body) {
     const { pathname, searchParams } = new URL(url, 'http://demo.invalid');
-    if (pathname.startsWith('/admin')) return cloud.admin(pathname, body);
+    if (pathname.startsWith('/admin')) return cloud.admin(pathname, body, method);
     const db = loadDb();
     try {
       db.users.forEach(prepareForCloud);
@@ -559,7 +567,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         // 오류가 나면 저장하지 않으므로 절반만 바뀐 자료가 남지 않는다.
         storage.setItem(KEY, JSON.stringify(db));
         // 수면 화면이 켜져 있는 동안 1분마다 보내지 않도록 하트비트는 다음 동작 때 함께 보낸다.
-        if (acting?.dirty && pathname !== '/sleep/heartbeat') flush(acting.id);
+        if (acting?.dirty && !acting.cloudDeleted && pathname !== '/sleep/heartbeat') flush(acting.id);
         return result?.status ? result : { status: 200, data: result };
       }
       throw new HttpError(404, '없는 주소입니다.');

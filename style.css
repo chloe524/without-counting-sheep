@@ -313,3 +313,7 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.81
 .badge { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
 .badge.required { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 .badge.recommended { border-color: var(--accent); color: var(--accent); }
+
+/* 개발자 모드 삭제 */
+.danger-zone { border-top: 2px solid #a33a2a; padding-top: 16px; }
+.btn.danger { background: #a33a2a; border-color: #a33a2a; color: #fff; }
