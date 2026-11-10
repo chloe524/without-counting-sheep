@@ -1,5 +1,5 @@
 // 시연판과 Supabase 서버 기능 사이의 통신. 저장소가 잠시 안 되어도 사이트는 계속 쓸 수 있어야 한다.
-import { CLOUD_ORIGIN } from './cloud-config.js?v=da6b196a09';
+import { CLOUD_ORIGIN } from './cloud-config.js?v=ec011d72a9';
 
 const ADMIN_ACTIONS = { '/admin/status': 'status', '/admin/participants': 'list' };
 

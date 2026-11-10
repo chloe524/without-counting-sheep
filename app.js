@@ -329,6 +329,7 @@ function viewSignup() {
           },
         });
         state.signup = null;
+        writeDraft(null);
         go('#/');
       }),
     },
@@ -439,7 +440,9 @@ function viewPersonalized(p) {
       el('h2', {}, '나의 수면 일지'),
       el('ul', {}, p.diary.map((t) => el('li', {}, t)))),
     el('p', {}, el('strong', {}, p.next)),
-    el('button', { class: 'btn', type: 'button', onclick: () => { state.me = null; route(); } }, '시작하기')));
+    el('div', { class: 'actions' },
+      el('button', { class: 'btn', type: 'button', onclick: () => { state.me = null; route(); } }, '시작하기'),
+      el('a', { class: 'btn ghost', href: '#/survey/edit' }, '설문 답 고치기'))));
 }
 
 function viewClassified(q, track, personalization) {
@@ -451,102 +454,99 @@ function viewClassified(q, track, personalization) {
       info.details.map((t) => el('p', {}, t)),
       el('p', {}, el('strong', {}, info.plan)),
       el('p', { class: 'small muted' }, q.trackInfo.notice)),
-    el('button', { class: 'btn', type: 'button', onclick: () => { if (personalization) viewPersonalized(personalization); else { state.me = null; route(); } } }, '계속하기')));
+    el('div', { class: 'actions' },
+      el('button', { class: 'btn', type: 'button', onclick: () => { if (personalization) viewPersonalized(personalization); else { state.me = null; route(); } } }, '계속하기'),
+      el('a', { class: 'btn ghost', href: '#/survey/edit' }, '설문 답 고치기'))));
 }
 
-async function viewBaseline() {
+// 설문 중 입력한 값을 이 탭에 잠시 보관한다. 이전 단계로 돌아가거나, 설문을 마친 뒤 고칠 때 다시 채워 넣는다.
+const DRAFT_KEY = 'baseline-draft';
+const readDraft = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+};
+const writeDraft = (draft) => {
+  try {
+    if (draft) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    else sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // 저장소가 막힌 브라우저에서는 이 화면 안에서만 기억한다.
+  }
+};
+
+function captureForm(form, into) {
+  for (const input of form.elements) {
+    if (!input.name) continue;
+    if (input.type === 'radio') {
+      if (input.checked) into[input.name] = input.value;
+    } else if (input.type === 'checkbox') {
+      into[input.name] = input.checked;
+    } else if (input.tagName !== 'BUTTON') {
+      into[input.name] = input.value;
+    }
+  }
+}
+
+function restoreForm(form, from) {
+  for (const input of form.elements) {
+    if (!input.name || !(input.name in from)) continue;
+    const value = from[input.name];
+    if (input.type === 'radio') {
+      input.checked = input.value === value;
+      if (input.checked) input.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (input.type === 'checkbox') {
+      input.checked = Boolean(value);
+    } else if (input.tagName !== 'BUTTON') {
+      input.value = value;
+    }
+  }
+}
+
+async function viewBaseline({ edit = false } = {}) {
   const q = await loadQuestions();
   const startedAt = Date.now();
-  const answers = {};
+  const saved = readDraft();
   // 어린이는 수면에 대한 잘못된 믿음(DBAS-16) 설문을 건너뛴다.
   const child = state.me?.age < GUARDIAN_AGE;
-  const TOTAL = child ? 7 : 8;
-  const step = (n, title, content, onNext, { button = '다음' } = {}) => {
-    const error = errorLine();
-    show(el('main', { class: 'stack-lg' },
-      el('p', { class: 'steps' }, `기초 설문 ${n}/${TOTAL}`),
-      state.me?.age < GUARDIAN_AGE ? guardianNotice() : null,
-      el('h1', {}, title),
-      el('form', {
-        class: 'stack-lg',
-        onsubmit: submitter(error, (e) => onNext(e.target)),
-      }, content, error, el('button', { class: 'btn', type: 'submit' }, button))));
-  };
-  const step1 = () => step(1, '기본 정보', [
-    el('p', { class: 'muted' }, '만 나이는 가입할 때 적은 값을 씁니다.'),
-    el('fieldset', {}, el('legend', {}, '생물학적 성'), radioScale('sex', [{ label: '남성', value: 'male' }, { label: '여성', value: 'female' }])),
-  ], (f) => {
-    answers.sex = formValue(f, 'sex');
-    step2();
-  });
-  const step2 = () => step(2, '요즘 잠은 어떤가요?', [sourceNote(q.sources.isi, q.sources.draftNotice), isiFields(q.isi)], (f) => {
-    answers.isi = readIsi(f, q.isi);
-    step3();
-  });
-  const step3 = () => step(3, '피츠버그 수면의 질 지수', psqiFields(q), (f) => {
-    answers.psqi = readPsqi(f, q);
-    step4();
-  });
-  const step4 = () => step(4, '수면 어려움의 기간', [
-    el('fieldset', {}, el('legend', {}, '수면 어려움이 얼마나 오래 이어졌나요?'), radioScale('duration', q.duration)),
-    el('fieldset', {}, el('legend', {}, '어려움을 겪는 밤은 얼마나 자주 있나요?'), radioScale('frequency', q.frequency)),
-  ], (f) => {
-    answers.duration = formValue(f, 'duration');
-    answers.frequency = formValue(f, 'frequency');
-    step5();
-  });
-  const step5 = () => step(5, '스트레스와 잠', [
-    sourceNote(q.sources.first, q.sources.draftNotice),
-    el('p', {}, '다음 상황에서 잠들기 어렵거나 잠을 설칠 가능성이 얼마나 되나요?'),
-    q.first.items.map((text, i) => scaleField(`first_${i}`, `${i + 1}. ${text}`, q.first.scale, 1)),
-  ], (f) => {
-    answers.first = q.first.items.map((_, i) => Number(formValue(f, `first_${i}`)));
-    step6();
-  });
-  const step6 = () => step(6, '잠들기 전 몸과 마음의 상태', [
-    el('p', {}, `${q.arousal.recall} 동안을 떠올리며 답해 주세요.`),
-    el('p', { class: 'small muted' }, `0 = ${q.arousal.scale[0]}, 1 = ${q.arousal.scale[1]}, 2 = ${q.arousal.scale[2]}, 3 = ${q.arousal.scale[3]}, 4 = ${q.arousal.scale[4]}`),
-    q.arousal.subscales.map((sub) => el('section', { class: 'stack' },
-      el('h2', {}, sub.name),
-      el('p', { class: 'small muted' }, sub.when),
-      sub.items.map((item) => scaleField(item.id, item.text, q.arousal.scale.map((label, i) => `${i} ${label}`))))),
-  ], (f) => {
-    answers.arousal = Object.fromEntries(q.arousal.subscales.flatMap((sub) => sub.items.map((item) => [item.id, Number(formValue(f, item.id))])));
-    if (child) step8();
-    else step7();
-  });
-  const step7 = () => step(7, '수면에 대한 생각', [
-    sourceNote(q.dbas, q.sources.draftNotice),
-    el('p', {}, '각 문장에 얼마나 동의하는지 0부터 10까지 골라 주세요.'),
-    el('p', { class: 'small muted' }, q.dbas.scaleNote),
-    q.dbas.items.map((item) => el('fieldset', {},
-      el('legend', {}, `${item.id}. ${item.text}`),
-      el('div', { class: 'scale numeric' }, Array.from({ length: 11 }, (_, v) => el('label', {},
-        el('input', { type: 'radio', name: `dbas_${item.id}`, value: String(v), required: true }),
-        el('span', {}, String(v))))))),
-  ], (f) => {
-    answers.dbas = q.dbas.items.map((item) => Number(formValue(f, `dbas_${item.id}`)));
-    step8();
-  });
-  const step8 = () => {
-    const error = errorLine();
-    const pregnancy = el('div', { hidden: true }, pregnancyBlock(q.pregnancyInfo));
-    show(el('main', { class: 'stack-lg' },
-      el('p', { class: 'steps' }, `기초 설문 ${TOTAL}/${TOTAL}`),
-      state.me?.age < GUARDIAN_AGE ? guardianNotice() : null,
-      el('h1', {}, '안전을 위한 질문'),
-      el('form', {
-        class: 'stack-lg',
-        onsubmit: submitter(error, async (e) => {
-          const f = e.target;
-          const safety = Object.fromEntries(q.safety.map((s) => [s.id, formValue(f, s.id) === 'yes']));
-          const r = await api('/survey/baseline', { method: 'POST', body: { ...answers, safety, elapsedSec: Math.round((Date.now() - startedAt) / 1000) } });
-          state.me = null;
-          if (r.excluded) go('#/');
-          else if (r.mentalHealth === 'caution') viewMentalCaution(q, () => viewClassified(q, r.track, r.personalization));
-          else viewClassified(q, r.track, r.personalization);
-        }),
-      },
+  const pregnancy = el('div', { hidden: true }, pregnancyBlock(q.pregnancyInfo));
+  const steps = [
+    { title: '기본 정보', content: () => [
+      el('p', { class: 'muted' }, '만 나이는 가입할 때 적은 값을 씁니다.'),
+      el('fieldset', {}, el('legend', {}, '생물학적 성'), radioScale('sex', [{ label: '남성', value: 'male' }, { label: '여성', value: 'female' }])),
+    ] },
+    { title: '요즘 잠은 어떤가요?', content: () => [sourceNote(q.sources.isi, q.sources.draftNotice), isiFields(q.isi)] },
+    { title: '피츠버그 수면의 질 지수', content: () => psqiFields(q) },
+    { title: '수면 어려움의 기간', content: () => [
+      el('fieldset', {}, el('legend', {}, '수면 어려움이 얼마나 오래 이어졌나요?'), radioScale('duration', q.duration)),
+      el('fieldset', {}, el('legend', {}, '어려움을 겪는 밤은 얼마나 자주 있나요?'), radioScale('frequency', q.frequency)),
+    ] },
+    { title: '스트레스와 잠', content: () => [
+      sourceNote(q.sources.first, q.sources.draftNotice),
+      el('p', {}, '다음 상황에서 잠들기 어렵거나 잠을 설칠 가능성이 얼마나 되나요?'),
+      q.first.items.map((text, i) => scaleField(`first_${i}`, `${i + 1}. ${text}`, q.first.scale, 1)),
+    ] },
+    { title: '잠들기 전 몸과 마음의 상태', content: () => [
+      el('p', {}, `${q.arousal.recall} 동안을 떠올리며 답해 주세요.`),
+      el('p', { class: 'small muted' }, q.arousal.scale.map((label, i) => `${i} = ${label}`).join(', ')),
+      q.arousal.subscales.map((sub) => el('section', { class: 'stack' },
+        el('h2', {}, sub.name),
+        el('p', { class: 'small muted' }, sub.when),
+        sub.items.map((item) => scaleField(item.id, item.text, q.arousal.scale.map((label, i) => `${i} ${label}`))))),
+    ] },
+    child ? null : { title: '수면에 대한 생각', content: () => [
+      sourceNote(q.dbas, q.sources.draftNotice),
+      el('p', {}, '각 문장에 얼마나 동의하는지 0부터 10까지 골라 주세요.'),
+      el('p', { class: 'small muted' }, q.dbas.scaleNote),
+      q.dbas.items.map((item) => el('fieldset', {},
+        el('legend', {}, `${item.id}. ${item.text}`),
+        el('div', { class: 'scale numeric' }, Array.from({ length: 11 }, (_, v) => el('label', {},
+          el('input', { type: 'radio', name: `dbas_${item.id}`, value: String(v), required: true }),
+          el('span', {}, String(v))))))),
+    ] },
+    { title: '안전을 위한 질문', last: true, content: () => [
       el('p', {}, '프로그램이 맞지 않거나 일부 안내를 빼야 하는 경우를 확인합니다. 진단이 아닙니다.'),
       q.safety.map((s) => el('fieldset', {},
         el('legend', {}, s.text),
@@ -555,11 +555,69 @@ async function viewBaseline() {
           onchange: s.id === 'pregnant' ? (e) => { pregnancy.hidden = e.target.value !== 'yes'; } : undefined,
         }),
         s.id === 'pregnant' ? pregnancy : null)),
-      error,
-      el('button', { class: 'btn', type: 'submit' }, '설문 마치기'))));
+    ] },
+  ].filter(Boolean);
+  const total = steps.length;
+  const n = (name) => Number(saved[name]);
+
+  const answersFrom = () => ({
+    sex: saved.sex,
+    isi: q.isi.map((item) => n(item.id)),
+    duration: saved.duration,
+    frequency: saved.frequency,
+    psqi: {
+      bedtime: saved.bedtime, wake: saved.wake, latencyMin: n('latencyMin'), sleepHours: n('sleepHours'), afterWakeMin: n('afterWakeMin'),
+      q5: q.psqi.disturbances.map((_, i) => n(`q5_${i}`)), q6: n('q6'), q7: n('q7'), q8: n('q8'), q9: n('q9'),
+    },
+    first: q.first.items.map((_, i) => n(`first_${i}`)),
+    arousal: Object.fromEntries(q.arousal.subscales.flatMap((sub) => sub.items.map((item) => [item.id, n(item.id)]))),
+    dbas: child ? undefined : q.dbas.items.map((item) => n(`dbas_${item.id}`)),
+    safety: Object.fromEntries(q.safety.map((s) => [s.id, saved[s.id] === 'yes'])),
+  });
+
+  const render = (index) => {
+    const current = steps[index];
+    const error = errorLine();
+    const form = el('form', {
+      class: 'stack-lg',
+      onsubmit: submitter(error, async (e) => {
+        captureForm(e.target, saved);
+        writeDraft(saved);
+        if (!current.last) return render(index + 1);
+        const r = await api('/survey/baseline', { method: 'POST', body: { ...answersFrom(), elapsedSec: Math.round((Date.now() - startedAt) / 1000) } });
+        state.me = null;
+        if (r.excluded) go('#/');
+        else if (r.mentalHealth === 'caution') viewMentalCaution(q, () => viewClassified(q, r.track, r.personalization));
+        else viewClassified(q, r.track, r.personalization);
+      }),
+    },
+    current.content(),
+    error,
+    el('div', { class: 'actions' },
+      index > 0 ? el('button', {
+        class: 'btn ghost', type: 'button',
+        onclick: () => {
+          captureForm(form, saved);
+          writeDraft(saved);
+          render(index - 1);
+        },
+      }, '이전') : null,
+      el('button', { class: 'btn', type: 'submit' }, current.last ? (edit ? '고친 답 제출하기' : '설문 마치기') : '다음')));
+    show(el('main', { class: 'stack-lg' },
+      el('p', { class: 'steps' }, `기초 설문 ${index + 1}/${total}`),
+      edit && index === 0 ? el('p', { class: 'notice' }, '이미 낸 답을 고치고 있어요. 다시 제출하면 분류와 맞춤 플랜도 새 답으로 다시 만들어요.') : null,
+      child ? guardianNotice() : null,
+      el('h1', {}, current.title),
+      form));
+    restoreForm(form, saved);
   };
-  step1();
+  render(0);
 }
+
+// 설문을 낸 뒤 프로그램을 시작하기 전까지 보여 주는 "답 고치기" 링크.
+const editBaselineLink = () => (state.me?.baselineEditable
+  ? el('a', { class: 'btn ghost', href: '#/survey/edit' }, '설문 답 고치기')
+  : null);
 
 const mentalHealthBlock = (info) => el('div', { class: 'stack' },
   el('h1', {}, info.title),
@@ -575,6 +633,7 @@ async function viewExcluded() {
       el('h1', {}, '이 프로그램에 참여하기 어렵습니다'),
       el('p', {}, '응답해 주신 내용을 보면, 이 프로그램의 안내가 안전하게 맞지 않을 수 있습니다. 진단이 아니라, 연구 참여 기준에 따른 안내입니다.'),
       el('p', {}, '수면 때문에 힘들다면 의사와 상담해 주세요. 이 결과로 어떤 불이익도 없습니다.')),
+    state.me.baselineEditable ? el('p', {}, '답을 잘못 고르셨다면 고칠 수 있어요. ', editBaselineLink()) : null,
     el('p', { class: 'small muted' }, `궁금한 점은 연구자(${config.researcher.email})에게 문의해 주세요.`),
     logoutButton()));
 }
@@ -595,6 +654,7 @@ async function viewEducationList() {
     el('div', { class: 'stack' },
       el('h1', {}, '기초 교육'),
       el('p', {}, `3주 플랜을 시작하기 전에 잠의 원리를 익히고 내 계획을 세워요. 모두 약 ${total}분 걸리고, 나눠서 해도 됩니다.`)),
+    editBaselineLink(),
     el('ol', { class: 'modules' }, modules.map((m, i) => {
       const inner = [el('span', { class: 'num' }, String(i + 1)), el('span', {}, el('strong', {}, m.title), el('br'), el('span', { class: 'small muted' }, m.done ? '완료' : `약 ${m.minutes}분`))];
       return el('li', {}, i <= nextIndex || m.done ? el('a', { href: `#/education/${m.id}` }, inner) : el('div', { class: 'locked' }, inner));
@@ -1140,6 +1200,7 @@ const logoutButton = () => el('button', {
   onclick: async () => {
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
     state.me = null;
+    writeDraft(null);
     go('#/login');
   },
 }, '로그아웃');
@@ -1223,6 +1284,7 @@ async function viewSettings() {
       el('h2', {}, '동의서'),
       el('a', { href: '/api/consent/copy', download: 'consent-copy.txt' }, '동의서 사본 내려받기')),
     el('section', { class: 'stack' },
+      state.me?.baselineEditable ? el('p', {}, '프로그램을 시작하기 전이라 기초 설문 답을 고칠 수 있어요. ', editBaselineLink()) : null,
       el('h2', {}, '문의'),
       el('p', {}, `연구자: ${config.researcher.email}, ${config.researcher.phone}`),
       el('p', {}, el('a', { href: '#/developer' }, '개발자 모드'))),
@@ -1256,35 +1318,38 @@ function viewWithdrawn() {
 async function viewFinalSurvey() {
   const q = await loadQuestions();
   const startedAt = Date.now();
-  const answers = {};
-  const finish = () => {
+  const saved = {};
+  const n = (name) => Number(saved[name]);
+  const screens = [
+    { label: '종료 설문 1/3', intro: [el('h1', {}, '3주를 마쳤어요'), el('p', {}, '처음에 답했던 수면 설문에 다시 답해 주세요.')], content: () => [sourceNote(q.sources.isi, q.sources.draftNotice), isiFields(q.isi)] },
+    { label: '종료 설문 2/3', intro: [el('h1', {}, '피츠버그 수면의 질 지수')], content: () => psqiFields(q), last: true },
+  ];
+  const render = (index) => {
+    const current = screens[index];
     const error = errorLine();
-    show(el('main', { class: 'stack-lg' },
-      el('div', { class: 'stack' },
-        el('p', { class: 'steps' }, '종료 설문 2/3'),
-        el('h1', {}, '피츠버그 수면의 질 지수')),
-      el('form', {
-        class: 'stack-lg',
-        onsubmit: submitter(error, async (e) => {
-          await api('/survey/final', { method: 'POST', body: { ...answers, psqi: readPsqi(e.target, q), elapsedSec: Math.round((Date.now() - startedAt) / 1000) } });
-          state.me = null;
-          go('#/');
-        }),
-      }, psqiFields(q), error, el('button', { class: 'btn', type: 'submit' }, '다음'))));
-  };
-  const error = errorLine();
-  show(el('main', { class: 'stack-lg' },
-    el('div', { class: 'stack' },
-      el('p', { class: 'steps' }, '종료 설문 1/3'),
-      el('h1', {}, '3주를 마쳤어요'),
-      el('p', {}, '처음에 답했던 수면 설문에 다시 답해 주세요.')),
-    el('form', {
+    const form = el('form', {
       class: 'stack-lg',
-      onsubmit: submitter(error, (e) => {
-        answers.isi = readIsi(e.target, q.isi);
-        finish();
+      onsubmit: submitter(error, async (e) => {
+        captureForm(e.target, saved);
+        if (!current.last) return render(index + 1);
+        const psqi = {
+          bedtime: saved.bedtime, wake: saved.wake, latencyMin: n('latencyMin'), sleepHours: n('sleepHours'), afterWakeMin: n('afterWakeMin'),
+          q5: q.psqi.disturbances.map((_, i) => n(`q5_${i}`)), q6: n('q6'), q7: n('q7'), q8: n('q8'), q9: n('q9'),
+        };
+        await api('/survey/final', { method: 'POST', body: { isi: q.isi.map((item) => n(item.id)), psqi, elapsedSec: Math.round((Date.now() - startedAt) / 1000) } });
+        state.me = null;
+        go('#/');
       }),
-    }, sourceNote(q.sources.isi, q.sources.draftNotice), isiFields(q.isi), error, el('button', { class: 'btn', type: 'submit' }, '다음'))));
+    },
+    current.content(),
+    error,
+    el('div', { class: 'actions' },
+      index > 0 ? el('button', { class: 'btn ghost', type: 'button', onclick: () => { captureForm(form, saved); render(index - 1); } }, '이전') : null,
+      el('button', { class: 'btn', type: 'submit' }, '다음')));
+    show(el('main', { class: 'stack-lg' }, el('div', { class: 'stack' }, el('p', { class: 'steps' }, current.label), current.intro), form));
+    restoreForm(form, saved);
+  };
+  render(0);
 }
 
 async function viewUsability() {
@@ -1394,7 +1459,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=da6b196a09');
+      const { startDeveloper } = await import('./developer.js?v=ec011d72a9');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();
@@ -1411,6 +1476,7 @@ async function route() {
     if (state.me.sleep?.active) return viewSleepScreen(state.me.sleep.active);
     if (hash === '#/sleep/morning' && stage !== 'withdrawn' && stage !== 'excluded') return await viewSleepMorning();
     if (stage === 'withdrawn') return viewWithdrawn();
+    if (hash === '#/survey/edit' && state.me.baselineEditable) return await viewBaseline({ edit: true });
     if (stage === 'excluded') return await viewExcluded();
     if (stage === 'survey') return await viewBaseline();
     if (stage === 'education') {

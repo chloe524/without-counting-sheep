@@ -1,16 +1,16 @@
 // 공개 시연판의 서버 역할. src/app.js의 응답 형식을 따른다. 화면은 브라우저 저장소로 동작하고,
 // 바뀐 자료를 저장소(cloud)로 보내 개발자 모드에서 모든 참가자의 자료를 볼 수 있게 한다. 푸시와 이메일은 없다.
-import { offlineCloud } from './cloud.js?v=da6b196a09';
-import { study } from '../src/content/study.js?v=da6b196a09';
-import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=da6b196a09';
-import { isiItems, surveyQuestions } from '../src/content/survey.js?v=da6b196a09';
-import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=da6b196a09';
-import { educationIds, educationModules } from '../src/content/education.js?v=da6b196a09';
-import { fallbackPlan } from '../src/content/fallback-plans.js?v=da6b196a09';
+import { offlineCloud } from './cloud.js?v=ec011d72a9';
+import { study } from '../src/content/study.js?v=ec011d72a9';
+import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=ec011d72a9';
+import { isiItems, surveyQuestions } from '../src/content/survey.js?v=ec011d72a9';
+import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=ec011d72a9';
+import { educationIds, educationModules } from '../src/content/education.js?v=ec011d72a9';
+import { fallbackPlan } from '../src/content/fallback-plans.js?v=ec011d72a9';
 import {
   addDays, classifyTrack, computeSleepWindow, countedSeconds, diaryExtras, diaryMetrics, evaluateSafety, kstDate, kstTime, nextOccurrenceIso, parseTime,
   programPosition, resolveBedtimeReminder, scoreIsi, scoreSus, sleepPattern, summarizeDiary,
-} from '../src/rules.js?v=da6b196a09';
+} from '../src/rules.js?v=ec011d72a9';
 
 const KEY = 'without-counting-sheep-demo-v1';
 const REMEMBER_MS = 28 * 24 * 3600 * 1000;
@@ -139,6 +139,12 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
     purgeLocal(db, candidates.filter((x) => deleted.includes(x.code)).map((x) => x.id));
   };
 
+  // 기초 설문은 프로그램을 실제로 시작하기 전(일지, 교육, 과제, 수면 화면 기록이 없을 때)까지 다시 고칠 수 있다.
+  const BASELINE_KINDS = ['baseline-isi', 'baseline-psqi', 'first', 'arousal', 'dbas', 'profile', 'safety'];
+  const baselineEditable = (u) => !u.withdrawn_at && ['education', 'program'].includes(u.stage)
+    && !Object.keys(u.diary).length && !Object.keys(u.education).length
+    && !u.plans.some((p) => p.checks.length) && !u.sleep.length;
+
   const routes = [
     ['GET', /^\/public\/config$/, null, () => ({
       name: study.name,
@@ -226,6 +232,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         today: today(),
         crisis: Boolean(u.safety.crisis),
         mentalHealth: u.safety.mentalHealth ?? null,
+        baselineEditable: baselineEditable(u),
         relaxCaution: Boolean(u.safety.relaxCaution),
         pregnant: Boolean(u.safety.pregnant),
         restrictionStopped: Boolean(u.restriction_stopped_at),
@@ -235,8 +242,10 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
 
     ['GET', /^\/survey\/questions$/, 'auth', () => surveyQuestions()],
 
-    ['POST', /^\/survey\/baseline$/, 'active', ({ u, body }) => {
-      if (u.stage !== 'survey') throw new HttpError(409, '이미 기초 설문을 마쳤습니다.');
+    ['POST', /^\/survey\/baseline$/, 'auth', ({ u, body }) => {
+      if (u.withdrawn_at) throw new HttpError(403, '참여를 그만둔 계정입니다.');
+      const editing = u.stage !== 'survey';
+      if (editing && !baselineEditable(u)) throw new HttpError(409, '프로그램을 시작한 뒤에는 기초 설문을 고칠 수 없습니다.');
       let b;
       try {
         b = parseBaseline(body, { age: u.age });
@@ -246,6 +255,11 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       const verdict = evaluateSafety(b.safety, { age: u.age });
       const track = classifyTrack({ isiTotal: b.isiTotal, duration: b.duration, frequency: b.frequency });
       const at = iso();
+      if (editing) {
+        for (const kind of BASELINE_KINDS) delete u.surveys[kind];
+        u.plans = [];
+        u.program_start = null;
+      }
       Object.assign(u.surveys, {
         'baseline-isi': { answers: { isi: b.isi, duration: b.duration, frequency: b.frequency, sex: b.sex, wake: b.wake }, score: b.isiTotal, elapsed_sec: elapsedOf(body), created_at: at },
         'baseline-psqi': { answers: { ...b.psqi, components: b.psqiResult.components }, score: b.psqiResult.total, created_at: at },
