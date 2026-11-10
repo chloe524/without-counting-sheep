@@ -1,16 +1,16 @@
 // 공개 시연판의 서버 역할. src/app.js의 응답 형식을 따른다. 화면은 브라우저 저장소로 동작하고,
 // 바뀐 자료를 저장소(cloud)로 보내 개발자 모드에서 모든 참가자의 자료를 볼 수 있게 한다. 푸시와 이메일은 없다.
-import { offlineCloud } from './cloud.js';
-import { study } from '../src/content/study.js';
-import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js';
-import { isiItems, surveyQuestions } from '../src/content/survey.js';
-import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js';
-import { educationIds, educationModules } from '../src/content/education.js';
-import { fallbackPlan } from '../src/content/fallback-plans.js';
+import { offlineCloud } from './cloud.js?v=da6b196a09';
+import { study } from '../src/content/study.js?v=da6b196a09';
+import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=da6b196a09';
+import { isiItems, surveyQuestions } from '../src/content/survey.js?v=da6b196a09';
+import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=da6b196a09';
+import { educationIds, educationModules } from '../src/content/education.js?v=da6b196a09';
+import { fallbackPlan } from '../src/content/fallback-plans.js?v=da6b196a09';
 import {
   addDays, classifyTrack, computeSleepWindow, countedSeconds, diaryExtras, diaryMetrics, evaluateSafety, kstDate, kstTime, nextOccurrenceIso, parseTime,
   programPosition, resolveBedtimeReminder, scoreIsi, scoreSus, sleepPattern, summarizeDiary,
-} from '../src/rules.js';
+} from '../src/rules.js?v=da6b196a09';
 
 const KEY = 'without-counting-sheep-demo-v1';
 const REMEMBER_MS = 28 * 24 * 3600 * 1000;
@@ -251,8 +251,8 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         'baseline-psqi': { answers: { ...b.psqi, components: b.psqiResult.components }, score: b.psqiResult.total, created_at: at },
         first: { answers: { answers: b.first, group: b.firstResult.group }, score: b.firstResult.total, created_at: at },
         arousal: { answers: { answers: b.arousal, ...b.profile.arousal }, score: null, created_at: at },
-        dbas: { answers: { answers: b.dbas, ...b.dbasResult }, score: b.dbasResult.mean, created_at: at },
         profile: { answers: b.profile, score: null, created_at: at },
+        ...(b.dbasResult ? { dbas: { answers: { answers: b.dbas, ...b.dbasResult }, score: b.dbasResult.mean, created_at: at } } : {}),
         safety: { answers: b.safety, score: null, created_at: at },
       });
       Object.assign(u, {

@@ -1,9 +1,9 @@
 // 기초 설문 채점과 개인 맞춤 기준표. 서버(src/app.js)와 시연판(demo/api.js)이 함께 쓴다.
-import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js';
-import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js';
-import { dbasSurvey } from './content/dbas.js';
-import { moduleContent } from './content/modules.js';
-import { parseTime, scoreIsi } from './rules.js';
+import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js?v=da6b196a09';
+import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js?v=da6b196a09';
+import { dbasSurvey } from './content/dbas.js?v=da6b196a09';
+import { moduleContent } from './content/modules.js?v=da6b196a09';
+import { parseTime, scoreIsi } from './rules.js?v=da6b196a09';
 
 const isScale = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const band = (value, cuts) => cuts.findIndex((limit) => value <= limit);
@@ -93,6 +93,10 @@ export function scoreDbas(answers) {
 // 침대에 머무는 시간 = 잠들기까지의 시간 + 수면 시간 + 깬 뒤 침대에 있는 시간
 export const timeInBedMin = ({ latencyMin, sleepHours, afterWakeMin }) => latencyMin + Math.round(sleepHours * 60) + afterWakeMin;
 
+// 만 14세 미만을 어린이로 본다. 보호자와 함께 설문하고, DBAS-16은 하지 않는다.
+export const CHILD_AGE = 14;
+export const GUARDIAN_AGE = CHILD_AGE;
+
 const ISI_AT_RISK = 2;
 const EXCESS_BED_MIN = 60;
 
@@ -108,10 +112,10 @@ export function buildProfile({ age, sex, isi, psqiResult, firstResult, arousal, 
   if (isi[4] >= ISI_AT_RISK || c.daytime >= 2) areas.push('daytime');
   if (isi[6] >= ISI_AT_RISK) areas.push('worry');
   if (firstResult.group !== 'nonreactive') areas.push('stress');
-  if (dbas.high) areas.push('beliefs');
+  if (dbas?.high) areas.push('beliefs');
   if (c.medication >= 1) areas.push('medication');
   return {
-    age, sex, areas,
+    age, sex, child: age < CHILD_AGE, areas,
     isiItems: { onset: isi[0], maintenance: isi[1], earlyWaking: isi[2], satisfaction: isi[3], daytime: isi[4], noticeable: isi[5], worry: isi[6] },
     psqiComponents: c,
     firstTotal: firstResult.total,
@@ -133,12 +137,14 @@ export function parseBaseline(body, { age }) {
   if (!Number.isInteger(psqi.afterWakeMin) || psqi.afterWakeMin < 0 || psqi.afterWakeMin > 300) throw new Error('깬 뒤 침대에 있는 시간을 확인해 주세요.');
   const firstResult = scoreFirst(first);
   const arousalResult = scoreArousal(arousal);
-  const dbasResult = scoreDbas(dbas);
+  // 어린이(만 14세 미만)는 수면에 대한 잘못된 믿음(DBAS-16) 설문을 하지 않는다.
+  const child = age < CHILD_AGE;
+  const dbasResult = child ? null : scoreDbas(dbas);
   const sleepMin = Math.round(psqi.sleepHours * 60);
   const tibMin = timeInBedMin(psqi);
   if (tibMin > 960) throw new Error('침대에 머무는 시간이 너무 깁니다. 입력한 시간을 확인해 주세요.');
   return {
-    isi, isiTotal, duration, frequency, safety, sex, psqi, psqiResult, first, firstResult, arousal, arousalResult, dbas, dbasResult,
+    isi, isiTotal, duration, frequency, safety, sex, psqi, psqiResult, first, firstResult, arousal, arousalResult, dbas: child ? null : dbas, dbasResult,
     wake: psqi.wake, sleepMin, tibMin,
     profile: buildProfile({ age, sex, isi, psqiResult, firstResult, arousal: arousalResult, dbas: dbasResult, sleepMin, tibMin }),
   };
@@ -228,7 +234,6 @@ export function resultVariables(profile, events, entries) {
   };
 }
 
-export const GUARDIAN_AGE = 14;
 
 // 만 14세 미만은 법정대리인(보호자)의 성명, 연락처, 동의 확인이 있어야 가입한다.
 export function parseGuardian({ age, guardianName, guardianContact, guardianConsent }) {
@@ -246,7 +251,9 @@ export function personalizationSummary(profile, verdict, track) {
   const view = moduleView(profile, [], 1);
   const a = profile.arousal;
   const bands = Object.entries(a.scores).map(([id, score]) => `${id} ${score}점(${BAND_LABEL[a.bands[id]]})`).join(', ');
-  const ageEffect = profile.age < 18
+  const ageEffect = profile.child
+    ? '어린이(만 14세 미만)라 보호자와 함께 진행하고, 수면 시간 조절 없이 기상 시간을 지키는 데 집중해요.'
+    : profile.age < 18
     ? '만 18세 미만이라 수면 시간 조절 대신 기상 시간을 지키는 데 집중해요.'
     : profile.age >= 65
       ? '만 65세 이상이라 수면 시간 조절 대신 기상 시간을 지키고, 밤에 일어나 걷는 안내를 빼요.'
@@ -264,7 +271,9 @@ export function personalizationSummary(profile, verdict, track) {
     { name: '과각성', value: bands, effect: arousalEffect },
     { name: '스트레스 반응(FIRST)', value: `${profile.firstTotal}점, ${FIRST_LABEL[profile.firstGroup]}`, effect: profile.firstGroup === 'nonreactive' ? '스트레스 관련 과제를 따로 넣지 않아요.' : '스트레스 받은 날 저녁 루틴 과제를 넣어요.' },
     { name: '침대에 머무는 시간', value: `${Math.floor(profile.tibMin / 60)}시간 ${profile.tibMin % 60}분`, effect: profile.areas.includes('timeInBed') ? '깬 뒤 바로 침대에서 나오는 과제를 넣어요.' : '수면 일지가 7일 쌓이면 실제 기록을 기준으로 다시 봐요.' },
-    { name: '수면에 대한 잘못된 믿음(DBAS-16)', value: `평균 ${profile.dbas.mean}점(0~10)`, effect: profile.dbas.high ? '잠에 대한 생각을 다시 보는 과제를 넣어요.' : '믿음 관련 과제는 넣지 않아요.' },
+    profile.dbas
+      ? { name: '수면에 대한 잘못된 믿음(DBAS-16)', value: `평균 ${profile.dbas.mean}점(0~10)`, effect: profile.dbas.high ? '잠에 대한 생각을 다시 보는 과제를 넣어요.' : '믿음 관련 과제는 넣지 않아요.' }
+      : { name: '수면에 대한 잘못된 믿음(DBAS-16)', value: '설문하지 않음', effect: '어린이는 이 설문을 하지 않아요.' },
   ];
   const diary = ['합의 수면일지 9개 항목은 모든 참가자가 같아요.'];
   if (view.stressDiary) diary.push('스트레스에 잠이 민감하게 반응하는 편이라, 매일 낮 스트레스 점수(0~4)도 함께 적어요.');

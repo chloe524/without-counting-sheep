@@ -286,8 +286,9 @@ async function viewConsent() {
   syncAll();
 }
 
+// 만 14세 미만을 어린이로 본다(src/baseline.js CHILD_AGE와 같은 값).
 const GUARDIAN_AGE = 14;
-const guardianNotice = () => el('p', { class: 'notice' }, `만 ${GUARDIAN_AGE}세 미만은 보호자와 함께 설문을 진행해 주세요. 보호자가 옆에서 문항을 함께 읽고, 답을 정하는 데 도와주세요.`);
+const guardianNotice = () => el('p', { class: 'notice' }, `어린이(만 ${GUARDIAN_AGE}세 미만)는 보호자와 함께 설문을 진행해 주세요. 보호자가 옆에서 문항을 함께 읽고, 답을 정하는 데 도와주세요.`);
 
 function viewSignup() {
   if (!state.signup) return go('#/');
@@ -457,7 +458,9 @@ async function viewBaseline() {
   const q = await loadQuestions();
   const startedAt = Date.now();
   const answers = {};
-  const TOTAL = 8;
+  // 어린이는 수면에 대한 잘못된 믿음(DBAS-16) 설문을 건너뛴다.
+  const child = state.me?.age < GUARDIAN_AGE;
+  const TOTAL = child ? 7 : 8;
   const step = (n, title, content, onNext, { button = '다음' } = {}) => {
     const error = errorLine();
     show(el('main', { class: 'stack-lg' },
@@ -509,7 +512,8 @@ async function viewBaseline() {
       sub.items.map((item) => scaleField(item.id, item.text, q.arousal.scale.map((label, i) => `${i} ${label}`))))),
   ], (f) => {
     answers.arousal = Object.fromEntries(q.arousal.subscales.flatMap((sub) => sub.items.map((item) => [item.id, Number(formValue(f, item.id))])));
-    step7();
+    if (child) step8();
+    else step7();
   });
   const step7 = () => step(7, '수면에 대한 생각', [
     sourceNote(q.dbas, q.sources.draftNotice),
@@ -1390,7 +1394,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js');
+      const { startDeveloper } = await import('./developer.js?v=da6b196a09');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();
