@@ -192,7 +192,8 @@ function viewLanding() {
     },
   });
   show({ banner: false }, el('main', { class: 'landing' },
-    el('h1', {}, config.name),
+    // 제목은 "sheep" 다음, 세미콜론 앞에서 줄을 바꾼다.
+    el('h1', {}, ...config.name.split(/(?=;)/).flatMap((part, i) => (i ? [el('br'), part] : [part]))),
     el('form', {
       class: 'stack',
       onsubmit: submitter(error, async (e) => {
@@ -1481,7 +1482,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=85dcbfc0bf');
+      const { startDeveloper } = await import('./developer.js?v=54a98959a6');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();

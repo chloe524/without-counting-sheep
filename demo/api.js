@@ -1,17 +1,17 @@
 // 공개 시연판의 서버 역할. src/app.js의 응답 형식을 따른다. 화면은 브라우저 저장소로 동작하고,
 // 바뀐 자료를 저장소(cloud)로 보내 개발자 모드에서 모든 참가자의 자료를 볼 수 있게 한다. 푸시와 이메일은 없다.
-import { offlineCloud } from './cloud.js?v=85dcbfc0bf';
-import { VAPID_PUBLIC_KEY } from './cloud-config.js?v=85dcbfc0bf';
-import { study } from '../src/content/study.js?v=85dcbfc0bf';
-import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=85dcbfc0bf';
-import { isiItems, surveyQuestions } from '../src/content/survey.js?v=85dcbfc0bf';
-import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=85dcbfc0bf';
-import { educationIds, educationModules } from '../src/content/education.js?v=85dcbfc0bf';
-import { fallbackPlan } from '../src/content/fallback-plans.js?v=85dcbfc0bf';
+import { offlineCloud } from './cloud.js?v=54a98959a6';
+import { VAPID_PUBLIC_KEY } from './cloud-config.js?v=54a98959a6';
+import { study } from '../src/content/study.js?v=54a98959a6';
+import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=54a98959a6';
+import { isiItems, surveyQuestions } from '../src/content/survey.js?v=54a98959a6';
+import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=54a98959a6';
+import { educationIds, educationModules } from '../src/content/education.js?v=54a98959a6';
+import { fallbackPlan } from '../src/content/fallback-plans.js?v=54a98959a6';
 import {
   addDays, classifyTrack, computeSleepWindow, countedSeconds, diaryExtras, diaryMetrics, evaluateSafety, kstDate, kstTime, nextOccurrenceIso, parseTime,
   programPosition, resolveBedtimeReminder, stageForTrack, scoreIsi, scoreSus, sleepPattern, summarizeDiary,
-} from '../src/rules.js?v=85dcbfc0bf';
+} from '../src/rules.js?v=54a98959a6';
 
 const KEY = 'without-counting-sheep-demo-v1';
 const REMEMBER_MS = 28 * 24 * 3600 * 1000;
