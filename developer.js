@@ -150,8 +150,8 @@ const minutes = (m) => {
 const yes = (v) => (v ? '예' : '아니요');
 const duration = (sec) => (sec < 60 ? `${sec}초` : minutes(Math.round(sec / 60)));
 
-const STAGE = { survey: '기초 설문 전', education: '기초 교육 중', program: '플랜 진행 중', 'final-survey': '재설문 단계', usability: '사용성 설문 단계', done: '모두 마침' };
-const TRACK = { long: '만성 불면(3주 플랜)', short: '일시·단기 불면(6일 플랜)' };
+const STAGE = { 'no-insomnia': '불면 해당 없음(플랜 없음)', survey: '기초 설문 전', education: '기초 교육 중', program: '플랜 진행 중', 'final-survey': '재설문 단계', usability: '사용성 설문 단계', done: '모두 마침' };
+const TRACK = { long: '만성 불면(3주 플랜)', short: '일시·단기 불면(6일 플랜)', none: '불면 해당 없음' };
 const PATTERN = { onset: '잠들기 어려운 유형', maintenance: '자다가 깨는 유형', mixed: '복합 유형' };
 const BAND = { low: '낮음', moderate: '중간', high: '높음' };
 const LEVEL = { required: '필수', recommended: '권장', optional: '선택' };

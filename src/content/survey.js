@@ -1,6 +1,6 @@
-import { arousalSurvey } from './arousal.js?v=a24e33003c';
-import { dbasSurvey } from './dbas.js?v=a24e33003c';
-import { moduleContent } from './modules.js?v=a24e33003c';
+import { arousalSurvey } from './arousal.js?v=85dcbfc0bf';
+import { dbasSurvey } from './dbas.js?v=85dcbfc0bf';
+import { moduleContent } from './modules.js?v=85dcbfc0bf';
 
 // ISI와 PSQI의 구조와 채점 방식을 따르는 임시 문구다. 공식 한국어판 문항이 아니다.
 // 저작권자 허가를 받은 뒤 공식 문항으로 교체하고 study.isiLicenseConfirmed를 true로 바꾼다.
@@ -123,6 +123,14 @@ export const trackInfo = {
     title: '만성 불면에 가까워요',
     details: ['수면 어려움이 3개월 이상, 일주일에 3번 이상 이어졌다고 답하셨습니다.'],
     plan: 'CBT-I 3주치 플랜으로 진행합니다. 먼저 기초 교육과 자극 조절을 약 1~2시간 진행한 뒤, 1, 2, 3주차 맞춤 플랜을 시작합니다.',
+  },
+  none: {
+    title: '지금은 불면증이라고 보기 어려워요',
+    details: [
+      '불면증 심각도 척도(ISI) 점수가 0~7점으로, "임상적으로 유의한 불면이 없는" 범위예요.',
+      'CBT-I는 불면증이 있는 사람을 위한 프로그램이라, 지금 답으로는 플랜을 만들지 않아요.',
+    ],
+    plan: '잠을 잘 지키려면 매일 같은 시간에 일어나고, 졸릴 때만 눕고, 잠자리에서 휴대폰을 멀리 두세요. 나중에 잠이 어려워지면 언제든 다시 설문할 수 있어요.',
   },
   notice: '진단이 아니라 설문 응답에 따른 프로그램 분류입니다.',
 };

@@ -1,17 +1,17 @@
 // 공개 시연판의 서버 역할. src/app.js의 응답 형식을 따른다. 화면은 브라우저 저장소로 동작하고,
 // 바뀐 자료를 저장소(cloud)로 보내 개발자 모드에서 모든 참가자의 자료를 볼 수 있게 한다. 푸시와 이메일은 없다.
-import { offlineCloud } from './cloud.js?v=a24e33003c';
-import { VAPID_PUBLIC_KEY } from './cloud-config.js?v=a24e33003c';
-import { study } from '../src/content/study.js?v=a24e33003c';
-import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=a24e33003c';
-import { isiItems, surveyQuestions } from '../src/content/survey.js?v=a24e33003c';
-import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=a24e33003c';
-import { educationIds, educationModules } from '../src/content/education.js?v=a24e33003c';
-import { fallbackPlan } from '../src/content/fallback-plans.js?v=a24e33003c';
+import { offlineCloud } from './cloud.js?v=85dcbfc0bf';
+import { VAPID_PUBLIC_KEY } from './cloud-config.js?v=85dcbfc0bf';
+import { study } from '../src/content/study.js?v=85dcbfc0bf';
+import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=85dcbfc0bf';
+import { isiItems, surveyQuestions } from '../src/content/survey.js?v=85dcbfc0bf';
+import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=85dcbfc0bf';
+import { educationIds, educationModules } from '../src/content/education.js?v=85dcbfc0bf';
+import { fallbackPlan } from '../src/content/fallback-plans.js?v=85dcbfc0bf';
 import {
   addDays, classifyTrack, computeSleepWindow, countedSeconds, diaryExtras, diaryMetrics, evaluateSafety, kstDate, kstTime, nextOccurrenceIso, parseTime,
-  programPosition, resolveBedtimeReminder, scoreIsi, scoreSus, sleepPattern, summarizeDiary,
-} from '../src/rules.js?v=a24e33003c';
+  programPosition, resolveBedtimeReminder, stageForTrack, scoreIsi, scoreSus, sleepPattern, summarizeDiary,
+} from '../src/rules.js?v=85dcbfc0bf';
 
 const KEY = 'without-counting-sheep-demo-v1';
 const REMEMBER_MS = 28 * 24 * 3600 * 1000;
@@ -142,7 +142,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
 
   // 기초 설문은 프로그램을 실제로 시작하기 전(일지, 교육, 과제, 수면 화면 기록이 없을 때)까지 다시 고칠 수 있다.
   const BASELINE_KINDS = ['baseline-isi', 'baseline-psqi', 'first', 'arousal', 'dbas', 'profile', 'safety'];
-  const baselineEditable = (u) => !u.withdrawn_at && ['education', 'program'].includes(u.stage)
+  const baselineEditable = (u) => !u.withdrawn_at && ['education', 'program', 'no-insomnia'].includes(u.stage)
     && !Object.keys(u.diary).length && !Object.keys(u.education).length
     && !u.plans.some((p) => p.checks.length) && !u.sleep.length;
 
@@ -272,10 +272,10 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       });
       Object.assign(u, {
         track, safety: verdict, wake_time: b.wake, baseline_sleep_min: b.sleepMin, baseline_tib_min: b.tibMin, sleep_pattern: sleepPattern(b.isi),
-        stage: track === 'long' ? 'education' : 'program', excluded_at: verdict.excluded ? iso() : null,
+        stage: stageForTrack(track), excluded_at: verdict.excluded ? iso() : null,
       });
       if (track === 'short' && !verdict.excluded) startProgram(u);
-      return { track, excluded: verdict.excluded, crisis: verdict.crisis, mentalHealth: verdict.mentalHealth, personalization: verdict.excluded ? null : personalizationSummary(b.profile, verdict, track) };
+      return { track, excluded: verdict.excluded, crisis: verdict.crisis, mentalHealth: verdict.mentalHealth, personalization: verdict.excluded || track === 'none' ? null : personalizationSummary(b.profile, verdict, track) };
     }],
 
     ['GET', /^\/education$/, 'active', ({ u }) => ({

@@ -1,5 +1,5 @@
 // 점수 계산, 안전 판정, 수면 시간 규칙. AI 응답은 이 값들을 바꿀 수 없다.
-import { isiItems, safetyItems, susItems } from './content/survey.js?v=a24e33003c';
+import { isiItems, safetyItems, susItems } from './content/survey.js?v=85dcbfc0bf';
 
 export const PROGRAM_DAYS = 21;
 // 의료진 감독이 없는 환경이라 보수적으로 잡은 하한. 근거 확인 전까지 study.sleepFloorConfirmed는 false다.
@@ -18,10 +18,16 @@ export function scoreSus(answers) {
   return answers.reduce((sum, a, i) => sum + (i % 2 === 0 ? a - 1 : 5 - a), 0) * 2.5;
 }
 
-// ISI는 최근 2주의 심각도만 재므로, 기간과 빈도 문항으로 플랜을 나눈다.
+// ISI 0~7점은 "임상적으로 유의한 불면 없음"이라 플랜을 주지 않는다(none).
+// 8점 이상이면 기간과 빈도 문항으로 만성(long)과 일시·단기(short)를 나눈다.
+export const ISI_INSOMNIA_MIN = 8;
 export function classifyTrack({ isiTotal, duration, frequency }) {
-  return duration === 'months' && frequency === 'high' && isiTotal >= 8 ? 'long' : 'short';
+  if (isiTotal < ISI_INSOMNIA_MIN) return 'none';
+  return duration === 'months' && frequency === 'high' ? 'long' : 'short';
 }
+
+// 분류에 따른 다음 단계. 불면에 해당하지 않으면 'no-insomnia' 단계에 머문다.
+export const stageForTrack = (track) => ({ long: 'education', short: 'program', none: 'no-insomnia' })[track];
 
 export function evaluateSafety(answers, { age }) {
   const hit = safetyItems.filter((item) => answers?.[item.id] === true);

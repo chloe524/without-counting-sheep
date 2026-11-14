@@ -586,7 +586,7 @@ async function viewBaseline({ edit = false } = {}) {
         if (!current.last) return render(index + 1);
         const r = await api('/survey/baseline', { method: 'POST', body: { ...answersFrom(), elapsedSec: Math.round((Date.now() - startedAt) / 1000) } });
         state.me = null;
-        if (r.excluded) go('#/');
+        if (r.excluded || r.track === 'none') go('#/');
         else if (r.mentalHealth === 'caution') viewMentalCaution(q, () => viewClassified(q, r.track, r.personalization));
         else viewClassified(q, r.track, r.personalization);
       }),
@@ -635,6 +635,20 @@ async function viewExcluded() {
       el('p', {}, '수면 때문에 힘들다면 의사와 상담해 주세요. 이 결과로 어떤 불이익도 없습니다.')),
     state.me.baselineEditable ? el('p', {}, '답을 잘못 고르셨다면 고칠 수 있어요. ', editBaselineLink()) : null,
     el('p', { class: 'small muted' }, `궁금한 점은 연구자(${config.researcher.email})에게 문의해 주세요.`),
+    logoutButton()));
+}
+
+// 설문 결과 불면에 해당하지 않을 때. 답을 잘못 골랐다면 고칠 수 있다.
+async function viewNoInsomnia() {
+  const info = (await loadQuestions()).trackInfo.none;
+  show(el('main', { class: 'stack-lg' },
+    el('div', { class: 'stack' },
+      el('p', { class: 'steps' }, '설문 결과에 따른 분류'),
+      el('h1', {}, info.title),
+      info.details.map((t) => el('p', {}, t)),
+      el('p', {}, info.plan),
+      el('p', { class: 'small muted' }, '진단이 아니라 설문 응답에 따른 분류입니다.')),
+    state.me.baselineEditable ? el('p', {}, '답을 잘못 고르셨다면 고칠 수 있어요. ', editBaselineLink()) : null,
     logoutButton()));
 }
 
@@ -1467,7 +1481,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=a24e33003c');
+      const { startDeveloper } = await import('./developer.js?v=85dcbfc0bf');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();
@@ -1487,6 +1501,7 @@ async function route() {
     if (hash === '#/survey/edit' && state.me.baselineEditable) return await viewBaseline({ edit: true });
     if (stage === 'excluded') return await viewExcluded();
     if (stage === 'survey') return await viewBaseline();
+    if (stage === 'no-insomnia') return await viewNoInsomnia();
     if (stage === 'education') {
       const m = /^#\/education\/([\w-]+)$/.exec(hash);
       return await (m ? viewEducationModule(m[1]) : viewEducationList());
