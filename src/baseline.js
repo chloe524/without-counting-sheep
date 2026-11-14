@@ -1,9 +1,9 @@
 // 기초 설문 채점과 개인 맞춤 기준표. 서버(src/app.js)와 시연판(demo/api.js)이 함께 쓴다.
-import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js?v=559ecf1f82';
-import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js?v=559ecf1f82';
-import { dbasSurvey } from './content/dbas.js?v=559ecf1f82';
-import { moduleContent } from './content/modules.js?v=559ecf1f82';
-import { parseTime, scoreIsi } from './rules.js?v=559ecf1f82';
+import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js?v=5285ea8d67';
+import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js?v=5285ea8d67';
+import { dbasSurvey } from './content/dbas.js?v=5285ea8d67';
+import { moduleContent } from './content/modules.js?v=5285ea8d67';
+import { parseTime, scoreIsi } from './rules.js?v=5285ea8d67';
 
 const isScale = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const band = (value, cuts) => cuts.findIndex((limit) => value <= limit);

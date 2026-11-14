@@ -420,6 +420,12 @@ export async function startDeveloper(target, { home = null } = {}) {
         el('p', {}, '.env 파일에 ADMIN_PASSWORD를 12자 이상으로 넣고 서버를 다시 켜 주세요.')));
     }
     if (status.loggedIn) return await viewList();
+    if (status.locked) {
+      return show(el('main', { class: 'stack' },
+        el('h1', {}, '개발자 모드에 들어갈 수 없습니다'),
+        el('p', {}, status.locked),
+        homeHref ? el('a', { href: homeHref }, '처음으로') : null));
+    }
     viewLogin();
   } catch (err) {
     if (err.message !== 'expired') show(el('p', { class: 'error' }, err.message));
