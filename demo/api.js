@@ -1,17 +1,17 @@
 // 공개 시연판의 서버 역할. src/app.js의 응답 형식을 따른다. 화면은 브라우저 저장소로 동작하고,
 // 바뀐 자료를 저장소(cloud)로 보내 개발자 모드에서 모든 참가자의 자료를 볼 수 있게 한다. 푸시와 이메일은 없다.
-import { offlineCloud } from './cloud.js?v=54a98959a6';
-import { VAPID_PUBLIC_KEY } from './cloud-config.js?v=54a98959a6';
-import { study } from '../src/content/study.js?v=54a98959a6';
-import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=54a98959a6';
-import { isiItems, surveyQuestions } from '../src/content/survey.js?v=54a98959a6';
-import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=54a98959a6';
-import { educationIds, educationModules } from '../src/content/education.js?v=54a98959a6';
-import { fallbackPlan } from '../src/content/fallback-plans.js?v=54a98959a6';
+import { offlineCloud } from './cloud.js?v=559ecf1f82';
+import { VAPID_PUBLIC_KEY } from './cloud-config.js?v=559ecf1f82';
+import { study } from '../src/content/study.js?v=559ecf1f82';
+import { allConsentIds, consentCopyText, consentDocument, requiredConsentIds } from '../src/content/consent.js?v=559ecf1f82';
+import { isiItems, surveyQuestions } from '../src/content/survey.js?v=559ecf1f82';
+import { MODULE_IDS, moduleView, needsStressScore, parseBaseline, parseGuardian, personalizationSummary, personalizeContent, resultVariables, scorePsqi } from '../src/baseline.js?v=559ecf1f82';
+import { educationIds, educationModules } from '../src/content/education.js?v=559ecf1f82';
+import { fallbackPlan } from '../src/content/fallback-plans.js?v=559ecf1f82';
 import {
   addDays, classifyTrack, computeSleepWindow, countedSeconds, diaryExtras, diaryMetrics, evaluateSafety, kstDate, kstTime, nextOccurrenceIso, parseTime,
   programPosition, resolveBedtimeReminder, stageForTrack, scoreIsi, scoreSus, sleepPattern, summarizeDiary,
-} from '../src/rules.js?v=54a98959a6';
+} from '../src/rules.js?v=559ecf1f82';
 
 const KEY = 'without-counting-sheep-demo-v1';
 const REMEMBER_MS = 28 * 24 * 3600 * 1000;
@@ -73,6 +73,7 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       previousTibMin: u.plans.find((p) => p.week === week - 1)?.window.tibMin ?? null,
       summary,
       dangerFlag: Boolean(u.restriction_stopped_at),
+      optIn: Boolean(u.restriction_opt_in),
     });
     const content = personalizeContent(fallbackPlan({ track: u.track, week, safety, pattern: u.sleep_pattern }), u.surveys.profile?.answers, safety);
     db.nextId += 1;
@@ -237,6 +238,8 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
         relaxCaution: Boolean(u.safety.relaxCaution),
         pregnant: Boolean(u.safety.pregnant),
         restrictionStopped: Boolean(u.restriction_stopped_at),
+        restrictionOptIn: Boolean(u.restriction_opt_in),
+        restrictionAvailable: u.track === 'long' && !u.safety.noRestriction && !u.restriction_stopped_at,
         sleep: u.withdrawn_at || u.excluded_at ? null : sleepStatus(u),
       };
     }],
@@ -334,6 +337,16 @@ export function createDemoApi({ storage, now = () => new Date(), cloud = offline
       if (!MODULE_IDS.includes(params[0])) throw new HttpError(404, '없는 모듈입니다.');
       u.usage = [...(u.usage ?? []), { event: `module-${params[0]}-${params[1]}`, elapsed_sec: null, occurred_on: today() }].slice(-500);
       return { ok: true };
+    }],
+
+    // 수면 시간 조절(수면 제한)을 켜거나 끈다. 끄면 이번 주 플랜에도 바로 적용하고, 켜면 다음 주 플랜부터 적용한다.
+    ['POST', /^\/restriction$/, 'active', ({ u, body }) => {
+      u.restriction_opt_in = body?.optIn === true;
+      const latest = [...u.plans].sort((a, b) => b.week - a.week)[0];
+      if (!u.restriction_opt_in && latest?.window.mode === 'window') {
+        latest.window = { ...latest.window, mode: 'wake-only', tibMin: null, bedtime: null, reason: '수면 시간 조절을 끄셨어요. 기상 시간만 지켜 주세요.' };
+      }
+      return { ok: true, optIn: u.restriction_opt_in };
     }],
 
     ['POST', /^\/diary$/, 'active', ({ u, body }) => {

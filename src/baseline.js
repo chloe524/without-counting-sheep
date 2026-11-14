@@ -1,9 +1,9 @@
 // 기초 설문 채점과 개인 맞춤 기준표. 서버(src/app.js)와 시연판(demo/api.js)이 함께 쓴다.
-import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js?v=54a98959a6';
-import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js?v=54a98959a6';
-import { dbasSurvey } from './content/dbas.js?v=54a98959a6';
-import { moduleContent } from './content/modules.js?v=54a98959a6';
-import { parseTime, scoreIsi } from './rules.js?v=54a98959a6';
+import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js?v=559ecf1f82';
+import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js?v=559ecf1f82';
+import { dbasSurvey } from './content/dbas.js?v=559ecf1f82';
+import { moduleContent } from './content/modules.js?v=559ecf1f82';
+import { parseTime, scoreIsi } from './rules.js?v=559ecf1f82';
 
 const isScale = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const band = (value, cuts) => cuts.findIndex((limit) => value <= limit);
@@ -278,7 +278,7 @@ export function personalizationSummary(profile, verdict, track) {
   const diary = ['합의 수면일지 9개 항목은 모든 참가자가 같아요.'];
   if (view.stressDiary) diary.push('스트레스에 잠이 민감하게 반응하는 편이라, 매일 낮 스트레스 점수(0~4)도 함께 적어요.');
   if (verdict.noRestriction || track !== 'long') diary.push('일지는 수면 시간 조절이 아니라 기상 시간과 수면 패턴을 살피는 데 써요.');
-  else diary.push('일지가 7일 이상 쌓이고 수면 효율이 85% 미만이면 2주차부터 수면 시간 조절을 시작해요.');
+  else diary.push('수면 시간 조절(수면 제한)은 선택 사항이에요. 설정에서 켜면, 일지가 7일 이상 쌓이고 수면 효율이 85% 미만일 때 2주차부터 적용해요.');
   return {
     variables,
     areas: profile.areas.map((id) => AREA_INFO[id]?.reason ?? id),

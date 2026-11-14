@@ -1,5 +1,5 @@
 // 점수 계산, 안전 판정, 수면 시간 규칙. AI 응답은 이 값들을 바꿀 수 없다.
-import { isiItems, safetyItems, susItems } from './content/survey.js?v=54a98959a6';
+import { isiItems, safetyItems, susItems } from './content/survey.js?v=559ecf1f82';
 
 export const PROGRAM_DAYS = 21;
 // 의료진 감독이 없는 환경이라 보수적으로 잡은 하한. 근거 확인 전까지 study.sleepFloorConfirmed는 false다.
@@ -106,10 +106,10 @@ export const RESTRICTION_MIN_NIGHTS = 7;
 export const RESTRICTION_SE_MAX = 85;
 export const PREGNANCY_FLEX_MIN = 60;
 
-// 수면 제한 게이트: 안전 문진 통과 + 일지 7일 이상 + 수면 효율 85% 미만을 모두 충족해야 시작한다(빨라야 2주차).
+// 수면 제한 게이트: 참가자 선택 + 안전 문진 통과 + 일지 7일 이상 + 수면 효율 85% 미만을 모두 충족해야 시작한다(빨라야 2주차).
 // 시작한 뒤에는 수면 효율 90% 이상이면 15분 늘리고, 85% 미만이면 15분 줄인다(하한 6시간 유지).
 // 임신 중에는 같은 하한을 지키고 취침·기상 시간에 30~60분의 여유를 둔다.
-export function computeSleepWindow({ track, safety, wake, previousTibMin = null, summary = { nights: 0 }, dangerFlag = false, totalNights = 0 }) {
+export function computeSleepWindow({ track, safety, wake, previousTibMin = null, summary = { nights: 0 }, dangerFlag = false, totalNights = 0, optIn = false }) {
   const wakeMin = parseTime(wake);
   const result = (mode, tib, reason) => ({
     mode,
@@ -128,6 +128,8 @@ export function computeSleepWindow({ track, safety, wake, previousTibMin = null,
       : '수면 시간 조절 없이, 기상 시간을 일정하게 지키는 데 집중해요.';
     return result('wake-only', null, reason);
   }
+  // 수면 시간 조절은 참가자가 직접 켜야 하는 선택 사항이다.
+  if (!optIn) return result('wake-only', null, '수면 시간 조절은 선택 사항이에요. 설정에서 켜면 다음 주부터 조건에 맞을 때 적용해요.');
   if (previousTibMin === null) {
     if (totalNights < RESTRICTION_MIN_NIGHTS) {
       return result('wake-only', null, `수면 일지가 ${RESTRICTION_MIN_NIGHTS}일 이상 쌓이기 전까지는 기상 시간만 지켜요. 지금까지 ${totalNights}일 적었어요.`);

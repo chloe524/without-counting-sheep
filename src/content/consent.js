@@ -1,4 +1,4 @@
-import { study } from './study.js?v=54a98959a6';
+import { study } from './study.js?v=559ecf1f82';
 
 const pending = (label, value) => value ?? `[확정 필요: ${label}]`;
 

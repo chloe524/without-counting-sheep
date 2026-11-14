@@ -21,7 +21,7 @@ async function api(path, { method = 'GET', body } = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && path !== '/login') {
+  if (res.status === 401 && path !== '/login' && path !== '/login2') {
     viewLogin('다시 로그인해 주세요.');
     throw new Error('expired');
   }
@@ -62,7 +62,8 @@ function viewLogin(message = '') {
         e.preventDefault();
         error.textContent = '';
         try {
-          await api('/login', { method: 'POST', body: { password: input.value } });
+          const r = await api('/login', { method: 'POST', body: { password: input.value } });
+          if (r.step === 'second') return viewSecondPassword(r.ticket);
           await viewList();
         } catch (err) {
           error.textContent = err.message;
@@ -73,6 +74,37 @@ function viewLogin(message = '') {
     error,
     el('button', { class: 'btn', type: 'submit' }, '들어가기')),
     homeHref ? el('a', { href: homeHref }, '처음으로') : null));
+  input.focus();
+}
+
+// 이중 보안: 첫 번째 비밀번호가 맞으면 두 번째 비밀번호를 5분 안에 입력해야 한다.
+function viewSecondPassword(ticket) {
+  const error = el('p', { class: 'error', role: 'alert' });
+  const input = el('input', { type: 'text', name: 'password2', required: true, autocomplete: 'off' });
+  for (const [name, value] of [['autocapitalize', 'none'], ['autocorrect', 'off'], ['spellcheck', 'false']]) input.setAttribute(name, value);
+  show(el('main', { class: 'stack-lg' },
+    el('div', { class: 'stack' },
+      el('p', { class: 'steps' }, '보안 확인 2/2'),
+      el('h1', {}, '두 번째 비밀번호'),
+      el('p', { class: 'small muted' }, '첫 번째 비밀번호를 확인했어요. 5분 안에 두 번째 비밀번호를 입력해 주세요.')),
+    el('form', {
+      class: 'stack',
+      onsubmit: async (e) => {
+        e.preventDefault();
+        error.textContent = '';
+        try {
+          await api('/login2', { method: 'POST', body: { ticket, password: input.value } });
+          await viewList();
+        } catch (err) {
+          if (err.message === 'expired') return;
+          error.textContent = err.message;
+        }
+      },
+    },
+    el('label', { class: 'field' }, el('span', {}, '두 번째 비밀번호'), input),
+    error,
+    el('button', { class: 'btn', type: 'submit' }, '들어가기')),
+    el('button', { class: 'link', type: 'button', onclick: () => viewLogin() }, '첫 번째 비밀번호부터 다시')));
   input.focus();
 }
 
@@ -309,6 +341,7 @@ async function viewDetail(code) {
         ['평소 침대에 있는 시간', minutes(p.baseline_tib_min)],
         ['수면 유형', PATTERN[p.sleep_pattern] ?? ''],
         ['안전 판정', [safety.excluded ? '참여 제외' : null, safety.crisis ? '위기 상담 안내' : null, safety.noRestriction ? '수면 시간 조절 제외' : null, safety.fallRisk ? '낙상 위험' : null, safety.relaxCaution ? '이완 주의' : null, safety.pregnant ? '임신 중(수정 규칙)' : null].filter(Boolean).join(', ') || '특이 사항 없음'],
+        ['수면 시간 조절(선택)', p.restriction_opt_in ? '사용' : '사용 안 함'],
         ['수면 시간 조절 중단', p.restriction_stopped_at ? kst(p.restriction_stopped_at) : '아니요'],
         ['참여 그만둠', p.withdrawn_at ? kst(p.withdrawn_at) : '아니요'],
       ])),

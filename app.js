@@ -1240,6 +1240,31 @@ async function enablePush(publicKey) {
   await api('/notifications/push', { method: 'POST', body: sub.toJSON() });
 }
 
+// 수면 시간 조절(수면 제한)은 참가자가 고르는 선택 사항이다.
+function restrictionSection() {
+  const saved = el('p', { class: 'hint good', role: 'status' });
+  const error = errorLine();
+  return el('section', { class: 'stack' },
+    el('h2', {}, '수면 시간 조절(선택)'),
+    el('p', {}, '침대에 있는 시간을 실제로 자는 시간에 맞춰 줄이는 방법이에요. 잠이 더 깊어지도록 돕지만, 처음 1~2주에는 피곤하고 졸릴 수 있어요.'),
+    el('ul', {},
+      el('li', {}, '켜도 일지가 7일 이상 쌓이고 수면 효율이 85% 미만일 때만, 다음 주 플랜부터 적용해요.'),
+      el('li', {}, '침대 시간은 6시간 아래로 줄이지 않아요.'),
+      el('li', {}, '졸릴 때는 운전과 기계 조작을 하지 마세요. 언제든 끌 수 있고, 끄면 바로 기상 시간만 지키는 방식으로 돌아가요.')),
+    el('form', {
+      class: 'stack',
+      onsubmit: submitter(error, async (e) => {
+        const optIn = formValue(e.target, 'optIn') === 'on';
+        await api('/restriction', { method: 'POST', body: { optIn } });
+        state.me.restrictionOptIn = optIn;
+        saved.textContent = optIn ? '수면 시간 조절을 켰어요. 조건에 맞으면 다음 주부터 적용해요.' : '수면 시간 조절을 껐어요.';
+      }),
+    },
+    el('label', { class: 'check' }, el('input', { type: 'checkbox', name: 'optIn', ...(state.me.restrictionOptIn ? { checked: true } : {}) }), el('span', {}, '수면 시간 조절 사용하기')),
+    error, saved,
+    el('button', { class: 'btn ghost', type: 'submit' }, '저장하기')));
+}
+
 async function viewSettings() {
   const n = await api('/notifications');
   const error = errorLine();
@@ -1308,6 +1333,7 @@ async function viewSettings() {
       el('a', { href: '/api/consent/copy', download: 'consent-copy.txt' }, '동의서 사본 내려받기')),
     el('section', { class: 'stack' },
       state.me?.baselineEditable ? el('p', {}, '프로그램을 시작하기 전이라 기초 설문 답을 고칠 수 있어요. ', editBaselineLink()) : null,
+      state.me?.restrictionAvailable ? restrictionSection() : null,
       el('h2', {}, '문의'),
       el('p', {}, `연구자: ${config.researcher.email}, ${config.researcher.phone}`),
       el('p', {}, el('a', { href: '#/developer' }, '개발자 모드'))),
@@ -1482,7 +1508,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=54a98959a6');
+      const { startDeveloper } = await import('./developer.js?v=559ecf1f82');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();
