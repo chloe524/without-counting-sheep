@@ -1,6 +1,6 @@
-import { arousalSurvey } from './arousal.js?v=7279f84bd5';
-import { dbasSurvey } from './dbas.js?v=7279f84bd5';
-import { moduleContent } from './modules.js?v=7279f84bd5';
+import { arousalSurvey } from './arousal.js?v=b613e14430';
+import { dbasSurvey } from './dbas.js?v=b613e14430';
+import { moduleContent } from './modules.js?v=b613e14430';
 
 // ISI와 PSQI의 구조와 채점 방식을 따르는 임시 문구다. 공식 한국어판 문항이 아니다.
 // 저작권자 허가를 받은 뒤 공식 문항으로 교체하고 study.isiLicenseConfirmed를 true로 바꾼다.
@@ -31,17 +31,17 @@ export const frequencyOptions = [
 // stop: 참여 불가(상담 안내), noRestriction: 수면 시간 조절 제외, fallRisk: 밤에 일어나 이동하는 안내 제외,
 // relaxCaution: 이완 실습 주의 안내, mental: 정신질환 안내 화면을 띄운다, pregnancy: 임신 중 수정 규칙(수면 창 6시간 이상, 30~60분 유연성)
 export const safetyItems = [
-  { id: 'selfHarm', text: '최근 2주 안에 죽고 싶다는 생각이나 자해 생각이 든 적이 있다', effect: 'stop', crisis: true },
-  { id: 'bipolar', text: '양극성 장애(조울증) 진단을 받았거나 조증 삽화를 겪은 적이 있다', effect: 'stop', mental: true },
-  { id: 'psychosis', text: '조현병 등 정신병적 장애로 진료를 받고 있거나 받은 적이 있다', effect: 'stop', mental: true },
-  { id: 'seizure', text: '뇌전증(발작) 진단을 받았다', effect: 'stop' },
-    { id: 'otherSleep', text: '코골이와 함께 숨이 멎는다는 말을 들었거나, 잠들 때 다리가 불편해 움직이고 싶은 느낌이 자주 있다', effect: 'stop' },
-  { id: 'unstable', text: '최근 상태가 불안정한 신체·정신 질환이 있다', effect: 'stop' },
-  { id: 'circadian', text: '교대근무를 하거나, 원하는 시간대와 몸의 수면 시간대가 크게 어긋나 있다', effect: 'stop' },
-  { id: 'pregnant', text: '현재 임신 중이다', effect: 'pregnancy' },
-  { id: 'driving', text: '운전이나 위험한 기계 조작을 일상적으로 한다', effect: 'noRestriction' },
-  { id: 'falls', text: '최근 넘어진 적이 있거나, 일어설 때 어지럽거나, 혼자 이동하기 어렵다', effect: 'fallRisk' },
-  { id: 'anxietyDep', text: '불안장애나 우울증으로 진료를 받고 있다', effect: 'relaxCaution', mental: true },
+  { id: 'selfHarm', text: '최근 2주 안에 죽고 싶다는 생각이나 자해 생각이 든 적이 있다', effect: 'stop', guidance: '지금 많이 힘드신 것 같아요. 혼자 견디지 말고 자살예방 상담전화 109(24시간)나 정신건강위기상담전화 1577-0199에 전화해 주세요. 위급하면 119에 전화하세요. 지금은 이 프로그램보다 안전이 먼저라 참여할 수 없어요.', crisis: true },
+  { id: 'bipolar', text: '양극성 장애(조울증) 진단을 받았거나 조증 삽화를 겪은 적이 있다', effect: 'stop', guidance: '양극성 장애가 있으면 잠을 줄이는 방법이 조증 삽화를 일으킬 수 있어요. 담당 정신건강의학과 의사와 수면 문제를 먼저 상의해 주세요. 이 프로그램에는 참여할 수 없어요.', mental: true },
+  { id: 'psychosis', text: '조현병 등 정신병적 장애로 진료를 받고 있거나 받은 적이 있다', effect: 'stop', guidance: '조현병 같은 정신병적 장애가 있으면 잠이 부족할 때 증상이 나빠질 수 있어요. 담당 의사와 수면 문제를 먼저 상의해 주세요. 이 프로그램에는 참여할 수 없어요.', mental: true },
+  { id: 'seizure', text: '뇌전증(발작) 진단을 받았다', effect: 'stop', guidance: '뇌전증이 있으면 잠이 부족할 때 발작 위험이 커질 수 있어요. 담당 신경과 의사와 수면 문제를 상의해 주세요. 이 프로그램에는 참여할 수 없어요.' },
+  { id: 'otherSleep', text: '코골이와 함께 숨이 멎는다는 말을 들었거나, 잠들 때 다리가 불편해 움직이고 싶은 느낌이 자주 있다', effect: 'stop', guidance: '숨이 멎는 코골이는 수면무호흡증, 잠들 때 다리가 불편한 느낌은 하지불안증후군일 수 있어요. 이런 경우에는 CBT-I보다 수면 클리닉의 검사가 먼저예요. 이 프로그램에는 참여할 수 없어요.' },
+  { id: 'unstable', text: '최근 상태가 불안정한 신체·정신 질환이 있다', effect: 'stop', guidance: '상태가 불안정한 질환이 있으면 그 치료가 먼저예요. 담당 의사와 수면 문제를 상의해 주세요. 이 프로그램에는 참여할 수 없어요.' },
+  { id: 'circadian', text: '교대근무를 하거나, 원하는 시간대와 몸의 수면 시간대가 크게 어긋나 있다', effect: 'stop', guidance: '교대근무를 하거나 몸의 수면 시간대가 크게 어긋난 경우(일주기 리듬 수면장애)에는 일반 CBT-I가 잘 맞지 않아요. 수면 전문의와 상의해 주세요. 이 프로그램에는 참여할 수 없어요.' },
+  { id: 'pregnant', text: '현재 임신 중이다', effect: 'pregnancy', guidance: '임신 중에는 수면 시간을 6시간 아래로 줄이지 않고, 취침·기상 시간에 30~60분 여유를 두는 방식으로 진행해요. 참여할 수 있어요.' },
+  { id: 'driving', text: '운전이나 위험한 기계 조작을 일상적으로 한다', effect: 'noRestriction', guidance: '졸음이 사고로 이어질 수 있어 수면 시간 조절(수면 제한)은 하지 않고, 기상 시간 지키기와 다른 과제로 진행해요. 졸릴 때는 운전과 기계 조작을 하지 마세요. 참여할 수 있어요.' },
+  { id: 'falls', text: '최근 넘어진 적이 있거나, 일어설 때 어지럽거나, 혼자 이동하기 어렵다', effect: 'fallRisk', guidance: '밤에 일어나 걷다가 넘어질 수 있어, "잠이 안 오면 침대에서 나오기" 대신 "침대에 앉아 쉬기"로 안내하고 수면 시간 조절도 하지 않아요. 참여할 수 있어요.' },
+  { id: 'anxietyDep', text: '불안장애나 우울증으로 진료를 받고 있다', effect: 'relaxCaution', guidance: '지금 받고 있는 치료가 먼저예요. 이 프로그램을 시작한다고 담당 의사에게 알리고, 이완 연습 중에 불안해지면 바로 멈추세요. 참여할 수 있어요.', mental: true },
 ];
 
 // System Usability Scale. 홀수 문항은 긍정, 짝수 문항은 부정 문장이다.
@@ -191,7 +191,7 @@ export const surveyQuestions = () => ({
   isi: isiItems,
   duration: durationOptions,
   frequency: frequencyOptions,
-  safety: safetyItems.map(({ id, text }) => ({ id, text })),
+  safety: safetyItems.map(({ id, text, effect, guidance }) => ({ id, text, stop: effect === 'stop', guidance })),
   sus: susItems,
   sources: surveySources,
   psqi: psqiItems,

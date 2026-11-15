@@ -424,7 +424,9 @@ const pregnancyBlock = (info) => el('div', { class: 'notice stack' },
   el('ul', {}, info.sitePolicy.points.map((t) => el('li', {}, t))),
   el('p', {}, info.sitePolicy.closing));
 
-function viewPersonalized(p) {
+async function viewPersonalized(p) {
+  state.me ??= await api('/me').catch(() => null);
+  const notes = safetyNotes(await loadQuestions(), state.me?.safetyHits, '안전 질문에 따른 안내');
   show(el('main', { class: 'stack-lg' },
     el('div', { class: 'stack' },
       el('p', { class: 'steps' }, '설문을 모두 마쳤어요'),
@@ -437,6 +439,7 @@ function viewPersonalized(p) {
       el('h2', {}, '설문에서 두드러진 부분'),
       p.areas.length ? el('ul', {}, p.areas.map((t) => el('li', {}, t))) : el('p', {}, '두드러진 영역이 없어 기본 과제로 진행해요.'),
       el('p', { class: 'small muted' }, '진단이 아니라 맞춤 과제를 고르는 기준이에요.')),
+    notes,
     el('section', { class: 'stack' },
       el('h2', {}, '나의 수면 일지'),
       el('ul', {}, p.diary.map((t) => el('li', {}, t)))),
@@ -549,13 +552,17 @@ async function viewBaseline({ edit = false } = {}) {
     ] },
     { title: '안전을 위한 질문', last: true, content: () => [
       el('p', {}, '프로그램이 맞지 않거나 일부 안내를 빼야 하는 경우를 확인합니다. 진단이 아닙니다.'),
-      q.safety.map((s) => el('fieldset', {},
-        el('legend', {}, s.text),
-        radioScale(s.id, [{ label: '아니요', value: 'no' }, { label: '예', value: 'yes' }], {
-          row: true,
-          onchange: s.id === 'pregnant' ? (e) => { pregnancy.hidden = e.target.value !== 'yes'; } : undefined,
-        }),
-        s.id === 'pregnant' ? pregnancy : null)),
+      q.safety.map((s) => {
+        // '예'를 고르면 그 문항에 맞는 안내를 바로 아래에 보여 준다.
+        const note = s.id === 'pregnant' ? pregnancy : el('p', { class: `notice${s.stop ? ' stop' : ''}`, hidden: true }, s.guidance);
+        return el('fieldset', {},
+          el('legend', {}, s.text),
+          radioScale(s.id, [{ label: '아니요', value: 'no' }, { label: '예', value: 'yes' }], {
+            row: true,
+            onchange: (e) => { note.hidden = e.target.value !== 'yes'; },
+          }),
+          note);
+      }),
     ] },
   ].filter(Boolean);
   const total = steps.length;
@@ -635,8 +642,18 @@ async function viewExcluded() {
       el('p', {}, '응답해 주신 내용을 보면, 이 프로그램의 안내가 안전하게 맞지 않을 수 있습니다. 진단이 아니라, 연구 참여 기준에 따른 안내입니다.'),
       el('p', {}, '수면 때문에 힘들다면 의사와 상담해 주세요. 이 결과로 어떤 불이익도 없습니다.')),
     state.me.baselineEditable ? el('p', {}, '답을 잘못 고르셨다면 고칠 수 있어요. ', editBaselineLink()) : null,
+    safetyNotes(await loadQuestions(), state.me.safetyHits),
     el('p', { class: 'small muted' }, `궁금한 점은 연구자(${config.researcher.email})에게 문의해 주세요.`),
     logoutButton()));
+}
+
+// '예'로 답한 안전 문항마다 안내를 정리해 보여 준다.
+function safetyNotes(q, hits = [], title = '답하신 내용에 따른 안내') {
+  const items = q.safety.filter((s) => hits.includes(s.id));
+  if (!items.length) return null;
+  return el('section', { class: 'stack' },
+    el('h2', {}, title),
+    el('ul', {}, items.map((s) => el('li', {}, el('strong', {}, s.text), el('br'), s.guidance))));
 }
 
 // 설문 결과 불면에 해당하지 않을 때. 답을 잘못 골랐다면 고칠 수 있다.
@@ -1508,7 +1525,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=7279f84bd5');
+      const { startDeveloper } = await import('./developer.js?v=b613e14430');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();

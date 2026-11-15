@@ -317,3 +317,6 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.81
 /* 개발자 모드 삭제 */
 .danger-zone { border-top: 2px solid #a33a2a; padding-top: 16px; }
 .btn.danger { background: #a33a2a; border-color: #a33a2a; color: #fff; }
+
+/* 참여할 수 없게 되는 안전 문항 안내 */
+.notice.stop { border-left-color: #a33a2a; }

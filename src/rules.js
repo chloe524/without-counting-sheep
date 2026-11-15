@@ -1,5 +1,5 @@
 // 점수 계산, 안전 판정, 수면 시간 규칙. AI 응답은 이 값들을 바꿀 수 없다.
-import { isiItems, safetyItems, susItems } from './content/survey.js?v=7279f84bd5';
+import { isiItems, safetyItems, susItems } from './content/survey.js?v=b613e14430';
 
 export const PROGRAM_DAYS = 21;
 // 의료진 감독이 없는 환경이라 보수적으로 잡은 하한. 근거 확인 전까지 study.sleepFloorConfirmed는 false다.
@@ -40,6 +40,7 @@ export function evaluateSafety(answers, { age }) {
     fallRisk: senior || hit.some((i) => i.effect === 'fallRisk'),
     relaxCaution: hit.some((i) => i.effect === 'relaxCaution'),
     pregnant: answers?.pregnant === true,
+    hits: hit.map((i) => i.id),
     // 정신질환 문항에 '예'로 답한 경우. 참여 제외(stop)면 치료 우선 안내, 아니면 주의 안내를 보여 준다.
     mentalHealth: hit.some((i) => i.mental) ? (hit.some((i) => i.mental && i.effect === 'stop') ? 'priority' : 'caution') : null,
   };
