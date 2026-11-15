@@ -122,8 +122,13 @@ const statusOf = (p) => {
   return p.stage;
 };
 
+// 이 Mac의 localhost에서 열었을 때만 비밀번호 없이 들어온다는 것을 알려 준다. 다른 기기는 언제나 비밀번호가 필요하다.
+const deviceSection = (status) => (status.thisDevice
+  ? el('p', { class: 'small muted' }, '이 Mac에서 열어 비밀번호 없이 들어왔어요. 다른 기기에서는 언제나 비밀번호가 필요해요.')
+  : null);
+
 async function viewList() {
-  const { participants, accessLog } = await api('/participants');
+  const [{ participants, accessLog }, status] = await Promise.all([api('/participants'), api('/status')]);
   const search = el('input', { type: 'text', placeholder: '이름, 아이디, 이메일, 전화번호, 코드', 'aria-label': '참가자 검색' });
   const holder = el('div');
   const render = () => {
@@ -145,6 +150,7 @@ async function viewList() {
     el('div', { class: 'actions' }, el('h1', {}, '개발자 모드'), logout()),
     el('p', { class: 'notice' }, '참가자의 개인정보와 건강정보입니다. 연구 목적으로만 열람하고, 화면을 켜 둔 채 자리를 비우지 마세요. 30분 뒤 자동으로 로그아웃됩니다.'),
     section(`참가자 ${participants.length}명`, search, holder),
+    deviceSection(status),
     el('details', {}, el('summary', {}, '최근 개발자 모드 사용 기록'), el('div', { class: 'stack' }, rowsTable(accessLog)))));
 }
 

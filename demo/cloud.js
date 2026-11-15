@@ -1,5 +1,5 @@
 // 시연판과 Supabase 서버 기능 사이의 통신. 저장소가 잠시 안 되어도 사이트는 계속 쓸 수 있어야 한다.
-import { CLOUD_ORIGIN } from './cloud-config.js?v=b613e14430';
+import { CLOUD_ORIGIN } from './cloud-config.js?v=0682c9ba19';
 
 const ADMIN_ACTIONS = { '/admin/status': 'status', '/admin/participants': 'list' };
 
@@ -64,14 +64,6 @@ export function createCloud({ fetchFn, tokenStore, baseUrl = `${CLOUD_ORIGIN}/fu
         if (path === '/admin/logout') {
           tokenStore.set(null);
           return { status: 200, data: { ok: true } };
-        }
-        if (path === '/admin/login' || path === '/admin/login2') {
-          const result = await post('developer-admin', path === '/admin/login'
-            ? { action: 'login', password: body?.password }
-            : { action: 'login2', ticket: body?.ticket, password: body?.password });
-          if (result.status === 200 && result.data.token) tokenStore.set(result.data.token);
-          if (result.status !== 200) return result;
-          return { status: 200, data: result.data.step ? { ok: true, step: result.data.step, ticket: result.data.ticket } : { ok: true } };
         }
         const code = /^\/admin\/participants\/([\w-]+)$/.exec(path)?.[1];
         const action = code ? (method === 'DELETE' ? 'delete' : 'detail') : ADMIN_ACTIONS[path];
