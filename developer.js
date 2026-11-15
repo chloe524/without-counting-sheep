@@ -147,7 +147,7 @@ async function viewList() {
   search.addEventListener('input', render);
   render();
   show(el('main', { class: 'stack-lg' },
-    el('div', { class: 'actions' }, el('h1', {}, '개발자 모드'), logout()),
+    el('div', { class: 'actions' }, el('h1', {}, '개발자 모드'), status.thisDevice ? null : logout()),
     el('p', { class: 'notice' }, '참가자의 개인정보와 건강정보입니다. 연구 목적으로만 열람하고, 화면을 켜 둔 채 자리를 비우지 마세요. 30분 뒤 자동으로 로그아웃됩니다.'),
     section(`참가자 ${participants.length}명`, search, holder),
     deviceSection(status),
