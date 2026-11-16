@@ -1525,7 +1525,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=67ae62bc31');
+      const { startDeveloper } = await import('./developer.js?v=cad11d25f1');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();
