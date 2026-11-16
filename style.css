@@ -260,6 +260,11 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.81
 .landing { min-height: calc(100svh - 56px); display: flex; flex-direction: column; justify-content: center; gap: 2rem; }
 .landing-actions { display: flex; flex-direction: column; gap: 12px; }
 .landing-actions .btn { text-align: center; padding: 14px 22px; font-size: var(--step-1); }
+.landing-static { justify-content: flex-start; }
+.landing-head { display: flex; flex-direction: column; gap: 1.25rem; }
+.landing-intro .lead { font-size: var(--step-0); line-height: 1.7; }
+.landing-intro ul { margin-top: 0.75rem; color: var(--muted); font-size: 0.9375rem; line-height: 1.65; }
+.landing-intro .note { margin-top: 0.75rem; color: var(--muted); font-size: 0.875rem; line-height: 1.6; }
 
 /* 수면 화면: 밤새 켜 두므로 테마와 무관하게 아주 어둡게. 시계는 일부러 두지 않는다. */
 .sleep-screen {
