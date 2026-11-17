@@ -320,3 +320,10 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.81
 
 /* 참여할 수 없게 되는 안전 문항 안내 */
 .notice.stop { border-left-color: #a33a2a; }
+
+/* 첫 화면 아래 소개 글 */
+.landing-intro { border-top: 1px solid var(--line); padding-top: 24px; margin-top: 8px; }
+.landing-intro h2 { font-size: var(--step-1, 1.25rem); }
+.landing-intro h3 { font-size: 1rem; margin-bottom: 0; }
+.landing-intro ol { padding-left: 1.2em; }
+.landing-intro li { margin: 4px 0; }

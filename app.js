@@ -1,4 +1,6 @@
 const root = document.getElementById('app');
+// index.html에 들어 있는 소개 글을 첫 화면을 그리기 전에 떼어 두었다가, 첫 화면 아래에 다시 붙인다.
+const siteIntro = document.getElementById('site-intro')?.cloneNode(true) ?? null;
 const tabs = document.getElementById('tabs');
 
 // ---------- 공통 도구 ----------
@@ -221,7 +223,8 @@ function viewLanding() {
     el('button', { class: 'btn', type: 'submit' }, '시작하기')),
     el('div', { class: 'landing-actions' },
       el('a', { class: 'btn ghost', href: '#/login' }, '재로그인'),
-      el('a', { class: 'btn ghost', href: '#/developer' }, '개발자 모드'))));
+      el('a', { class: 'btn ghost', href: '#/developer' }, '개발자 모드')),
+    siteIntro ? siteIntro.cloneNode(true) : null));
 }
 
 function renderBlocks(blocks) {
@@ -1543,7 +1546,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=562c1b73bc');
+      const { startDeveloper } = await import('./developer.js?v=9b0b3fe7fb');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();
