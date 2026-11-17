@@ -1,9 +1,9 @@
 // 기초 설문 채점과 개인 맞춤 기준표. 서버(src/app.js)와 시연판(demo/api.js)이 함께 쓴다.
-import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js?v=1c61d0218d';
-import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js?v=1c61d0218d';
-import { dbasSurvey } from './content/dbas.js?v=1c61d0218d';
-import { moduleContent } from './content/modules.js?v=1c61d0218d';
-import { parseTime, scoreIsi } from './rules.js?v=1c61d0218d';
+import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js?v=562c1b73bc';
+import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js?v=562c1b73bc';
+import { dbasSurvey } from './content/dbas.js?v=562c1b73bc';
+import { moduleContent } from './content/modules.js?v=562c1b73bc';
+import { parseTime, scoreIsi } from './rules.js?v=562c1b73bc';
 
 const isScale = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const band = (value, cuts) => cuts.findIndex((limit) => value <= limit);
@@ -288,6 +288,6 @@ export function personalizationSummary(profile, verdict, track) {
       ? '3주 플랜은 3주 동안 빠짐없이 해야 해요. 매일 수면 일지를 적고, 그날의 과제를 해 주세요.'
       : '6일 플랜은 6일 동안(1·2·3주차에 각 2일) 빠짐없이 해야 해요. 3주 동안 매일 수면 일지도 적어 주세요.',
     reward: '정해진 기간을 모두 마치고 마지막 설문까지 완료하면 소정의 상품을 드려요.',
-    reminder: '설정에서 푸시 알림을 켜면, 정한 시간에 매일 자기 전 알림과 아침 일지 알림을 받아요.',
+    reminder: '알림을 꼭 켜 주세요. 설정에서 푸시 알림을 켜면, 정한 시간에 매일 자기 전 알림과 아침 일지 알림을 받아요.',
   };
 }

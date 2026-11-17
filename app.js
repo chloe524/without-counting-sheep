@@ -828,6 +828,18 @@ async function modulesSection(plan) {
   return el('section', { class: 'stack' }, parts, notes.map((t) => el('p', { class: 'notice' }, t)));
 }
 
+// 푸시 알림을 아직 켜지 않았다면 오늘 화면 맨 위에서 켜 달라고 요청한다.
+async function notificationPrompt() {
+  const n = await api('/notifications');
+  if (!n.vapidPublicKey || n.pushEnabled) return null;
+  const apple = isAppleMobile() && !isStandalone();
+  return el('section', { class: 'notice stack' },
+    el('p', {}, el('strong', {}, '알림을 꼭 켜 주세요')),
+    el('p', {}, '매일 정한 시간에 자기 전 알림과 아침 일지 알림을 보내 드려요. 알림을 켜야 플랜을 빠짐없이 이어 갈 수 있어요.'),
+    apple ? el('p', { class: 'small' }, '아이폰·아이패드는 Safari 아래쪽 공유 버튼 → "홈 화면에 추가"를 누른 뒤, 홈 화면 아이콘으로 열어서 켜 주세요.') : null,
+    el('a', { class: 'btn', href: '#/settings' }, '알림 켜러 가기'));
+}
+
 async function viewToday() {
   const [{ plan, position, track }, diary] = await Promise.all([api('/plan/current'), api('/diary')]);
   const wroteToday = diary.entries.some((e) => e.night === diary.today);
@@ -868,7 +880,8 @@ async function viewToday() {
       el('ul', {}, plan.content.personal.map((t) => el('li', {}, t))))
     : null;
   const modules = await modulesSection(plan).catch(() => null);
-  show(el('main', { class: 'stack-lg' }, el('div', { class: 'stack' }, header), warnings, pregnancyNote, personal, diaryCta, chart, body, modules));
+  const notify = await notificationPrompt().catch(() => null);
+  show(el('main', { class: 'stack-lg' }, el('div', { class: 'stack' }, header), notify, warnings, pregnancyNote, personal, diaryCta, chart, body, modules));
   // show()가 이전 타이머를 지우므로 화면을 그린 뒤에 건다.
   if (plan.status !== 'ready') pollTimer = setTimeout(route, 3000);
 }
@@ -1530,7 +1543,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=1c61d0218d');
+      const { startDeveloper } = await import('./developer.js?v=562c1b73bc');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();
