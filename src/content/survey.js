@@ -1,6 +1,6 @@
-import { arousalSurvey } from './arousal.js?v=8607acb9ee';
-import { dbasSurvey } from './dbas.js?v=8607acb9ee';
-import { moduleContent } from './modules.js?v=8607acb9ee';
+import { arousalSurvey } from './arousal.js?v=1c61d0218d';
+import { dbasSurvey } from './dbas.js?v=1c61d0218d';
+import { moduleContent } from './modules.js?v=1c61d0218d';
 
 // ISI와 PSQI의 구조와 채점 방식을 따르는 임시 문구다. 공식 한국어판 문항이 아니다.
 // 저작권자 허가를 받은 뒤 공식 문항으로 교체하고 study.isiLicenseConfirmed를 true로 바꾼다.
