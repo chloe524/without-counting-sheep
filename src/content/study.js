@@ -7,7 +7,7 @@ export const study = {
   researcher: { email: 'yangseoyeon440@gmail.com', phone: '시연판 비공개' },
   storageNotice: 'Supabase, Inc.가 운영하는 저장소의 서울 지역 서버에 저장합니다. 연구자만 비밀번호로 보호된 관리 화면에서 볼 수 있습니다. 위탁·국외 이전 해당 여부는 확인 중입니다.',
 
-  reward: null, // 참여 보상
+  reward: '정해진 기간(6일 플랜 또는 3주 플랜)을 모두 마치고 마지막 설문까지 완료하면 소정의 상품을 드립니다.', // 참여 보상
   injuryCompensation: null, // 피해 보상 방법(IRB 규정)
   irbContact: null, // IRB·참여자 권리 문의처
   withdrawalDataPolicy: null, // '삭제합니다' 또는 '식별 정보를 제거한 뒤 분석에 사용합니다'

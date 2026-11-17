@@ -192,18 +192,8 @@ function viewLanding() {
     },
   });
   show({ banner: false }, el('main', { class: 'landing' },
-    el('header', { class: 'landing-head' },
-      // 제목은 "sheep" 다음, 세미콜론 앞에서 줄을 바꾼다.
-      el('h1', {}, ...config.name.split(/(?=;)/).flatMap((part, i) => (i ? [el('br'), part] : [part]))),
-      // 검색 결과와 처음 온 사람을 위한 소개. index.html의 정적 첫 화면과 같은 문구를 유지한다.
-      el('div', { class: 'landing-intro' },
-        el('p', { class: 'lead' }, '잠이 잘 오지 않거나 스트레스로 잠이 흔들릴 때, 수면 설문과 하루 5분 수면 일지로 내 잠 습관을 살펴보는 연구용 웹사이트입니다.'),
-        el('ul', {},
-          el('li', {}, '응답에 따라 6일 플랜 또는 3주 플랜을 안내받습니다.'),
-          el('li', {}, '일어나는 시간 고정하기, 잠에 대한 생각 살펴보기, 긴장 풀기 연습을 주차별로 진행합니다.'),
-          el('li', {}, '설문 결과에 따라 스트레스가 큰 날의 비상 루틴, 걱정 정리, 이완 연습도 안내합니다.'),
-          el('li', {}, '만 14세 미만은 보호자와 함께 참여합니다.')),
-        el('p', { class: 'note' }, '의사의 처방으로 쓰는 디지털 치료제가 아니며, 불면증을 진단하거나 치료하지 않습니다.'))),
+    // 제목은 "sheep" 다음, 세미콜론 앞에서 줄을 바꾼다.
+    el('h1', {}, ...config.name.split(/(?=;)/).flatMap((part, i) => (i ? [el('br'), part] : [part]))),
     el('form', {
       class: 'stack',
       onsubmit: submitter(error, async (e) => {
@@ -453,6 +443,10 @@ async function viewPersonalized(p) {
     el('section', { class: 'stack' },
       el('h2', {}, '나의 수면 일지'),
       el('ul', {}, p.diary.map((t) => el('li', {}, t)))),
+    el('section', { class: 'stack notice' },
+      el('p', {}, el('strong', {}, p.commitment)),
+      el('p', {}, p.reward),
+      el('p', { class: 'small' }, p.reminder)),
     el('p', {}, el('strong', {}, p.next)),
     el('div', { class: 'actions' },
       el('button', { class: 'btn', type: 'button', onclick: () => { state.me = null; route(); } }, '시작하기'),
@@ -1504,6 +1498,7 @@ async function viewResults() {
       r.sleepNights ? el('p', {}, `수면 화면을 쓴 ${r.sleepNights}일 동안 화면이 켜져 있던 시간은 평균 ${minutesToText(r.avgOnMin)}, 느낀 수면 시간은 평균 ${minutesToText(r.avgPerceivedMin)}이었습니다.`) : null),
     r.suggestConsult ? el('p', { class: 'notice' }, '수면 어려움이 아직 크다고 답하셨어요. 의사와 상담해 보시기를 권합니다.') : null,
     variablesSection(r.variables),
+    el('p', { class: 'notice' }, '정해진 기간을 모두 마치셨어요. 약속한 소정의 상품을 드릴 예정이며, 연구자가 따로 연락드릴게요.'),
     el('p', {}, '참여해 주셔서 고맙습니다.'),
     logoutButton()));
 }
@@ -1535,7 +1530,7 @@ async function route() {
     if (hash === '#/developer') {
       show({ banner: false });
       tabs.hidden = true;
-      const { startDeveloper } = await import('./developer.js?v=b613e14430');
+      const { startDeveloper } = await import('./developer.js?v=8607acb9ee');
       return await startDeveloper(root, { home: '#/' });
     }
     await loadMe();

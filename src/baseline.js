@@ -1,9 +1,9 @@
 // 기초 설문 채점과 개인 맞춤 기준표. 서버(src/app.js)와 시연판(demo/api.js)이 함께 쓴다.
-import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js?v=b613e14430';
-import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js?v=b613e14430';
-import { dbasSurvey } from './content/dbas.js?v=b613e14430';
-import { moduleContent } from './content/modules.js?v=b613e14430';
-import { parseTime, scoreIsi } from './rules.js?v=b613e14430';
+import { durationOptions, firstItems, frequencyOptions, psqiItems, safetyItems } from './content/survey.js?v=8607acb9ee';
+import { AROUSAL_BANDS, arousalSurvey } from './content/arousal.js?v=8607acb9ee';
+import { dbasSurvey } from './content/dbas.js?v=8607acb9ee';
+import { moduleContent } from './content/modules.js?v=8607acb9ee';
+import { parseTime, scoreIsi } from './rules.js?v=8607acb9ee';
 
 const isScale = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const band = (value, cuts) => cuts.findIndex((limit) => value <= limit);
@@ -284,5 +284,10 @@ export function personalizationSummary(profile, verdict, track) {
     areas: profile.areas.map((id) => AREA_INFO[id]?.reason ?? id),
     diary,
     next: track === 'long' ? '기초 교육을 마치면 이 기준으로 1주차 플랜이 만들어져요.' : '오늘부터 이 기준으로 만든 1주차 플랜을 시작해요.',
+    commitment: track === 'long'
+      ? '3주 플랜은 3주 동안 빠짐없이 해야 해요. 매일 수면 일지를 적고, 그날의 과제를 해 주세요.'
+      : '6일 플랜은 6일 동안(1·2·3주차에 각 2일) 빠짐없이 해야 해요. 3주 동안 매일 수면 일지도 적어 주세요.',
+    reward: '정해진 기간을 모두 마치고 마지막 설문까지 완료하면 소정의 상품을 드려요.',
+    reminder: '설정에서 푸시 알림을 켜면, 정한 시간에 매일 자기 전 알림과 아침 일지 알림을 받아요.',
   };
 }
